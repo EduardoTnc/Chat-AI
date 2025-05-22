@@ -1,0 +1,182 @@
+@startuml Diagrama_Casos_De_Uso_Chat_Reorganizado
+
+left to right direction
+
+title Diagrama de Casos de Uso - Módulo de Chat (Backend) - Reorganizado
+
+actor Cliente
+actor Agente
+actor Administrador
+
+Admin --|> Agente
+Agente --|> Cliente
+note on link: Un Administrador es un Agente, y un Agente es un Cliente\n(heredan capacidades y añaden específicas)
+
+package "Módulo de Chat - Backend" {
+
+    package "Funcionalidades Comunes (Todos los Usuarios Autenticados)" {
+        usecase "Conectar a Socket.IO" as UC_SocketConnect
+        usecase "Recibir Mensaje Nuevo" as UC_ReceiveMsg
+        usecase "Recibir Indicador 'Escribiendo...'" as UC_ReceiveTyping
+        usecase "Obtener Usuario Actual" as UC_GetMe
+        usecase "Cerrar Sesión" as UC_Logout
+    }
+
+    package "Casos de Uso del Cliente" {
+        usecase "Registrarse" as UC_Register
+        usecase "Iniciar Sesión (Cliente)" as UC_LoginClient
+        usecase "Refrescar Token de Acceso" as UC_RefreshToken
+
+        usecase "Enviar Mensaje a Otro Usuario" as UC_SendUserMsg
+        usecase "Enviar Mensaje a IA" as UC_SendIAMsg
+        usecase "Marcar Mensaje como Leído (Individual)" as UC_MarkMsgReadClient
+        usecase "Marcar Conversación como Leída (Cliente)" as UC_MarkConvReadClient
+        usecase "Indicar 'Escribiendo...' a Usuario/IA" as UC_TypingClient
+        usecase "Obtener Historial de Conversación (User-User)" as UC_GetHistoryUserUser
+        usecase "Obtener Historial de Conversación (User-IA)" as UC_GetHistoryUserIA
+        usecase "Obtener Lista de Mis Conversaciones" as UC_GetMyConvsClient
+        usecase "Obtener Modelos de IA Disponibles" as UC_GetAIModelsClient
+    }
+
+    package "Casos de Uso del Agente" {
+        usecase "Iniciar Sesión (Agente)" as UC_LoginAgent
+        ' Agente hereda Conectar a Socket, Recibir Mensaje, Typing, etc. de Cliente
+        usecase "Enviar Mensaje a Cliente (como Agente)" as UC_AgentSendMsgToClient
+        usecase "Ver Lista de Chats Escalados/Pendientes" as UC_ViewPendingChats
+        usecase "Tomar/Asignarse Chat Escalado" as UC_PickChatAgent
+        usecase "Cerrar Conversación Atendida" as UC_CloseConvAgent
+        usecase "Actualizar Título/Prioridad/Tags de Conversación" as UC_AgentUpdateConvMeta
+        usecase "Añadir Nota Interna a Conversación" as UC_AgentAddConvNote
+        usecase "Fijar/Desfijar Conversación Atendida" as UC_AgentPinConv
+        usecase "Obtener Historial de Conversación Atendida" as UC_GetHistoryAgentChat
+        usecase "Obtener Lista de Mis Conversaciones Asignadas" as UC_GetMyAssignedConvs
+    }
+
+    package "Casos de Uso del Administrador" {
+        usecase "Iniciar Sesión (Admin)" as UC_LoginAdmin
+        ' Admin hereda todos los casos de uso de Agente
+        usecase "Gestionar Configuración de Modelos IA" as UC_AdminManageAIModels
+        usecase "Gestionar API Keys de Proveedores IA" as UC_AdminManageAPIKeys
+        usecase "Ver Reporte de Costos de IA (General)" as UC_AdminViewCosts
+        usecase "Ver Todas las Conversaciones del Sistema" as UC_AdminViewAllConvs
+        usecase "Asignar Agente a Conversación Manualmente" as UC_AdminAssignAgentToConv
+        usecase "Gestionar Roles de Usuarios del Sistema" as UC_AdminManageUserRoles
+        usecase "Ver Logs del Sistema (Auditoría)" as UC_AdminViewLogs
+    }
+
+    package "Operaciones del Sistema y de IA (Backend Interno)" {
+        actor "Sistema IA Externa" as Ext_AI_System <<(S,orchid) System>>
+        actor "Sistema de Persistencia" as DB_System <<(S,orchid) System>>
+        actor "Sistema de Notificaciones" as Notif_System <<(S,orchid) System>>
+        actor "Sistema de Autenticación" as Auth_System <<(S,orchid) System>>
+
+        usecase "Procesar Mensaje para IA" as UC_Sys_ProcessIAMsg
+        usecase "Generar Respuesta de IA (con Proveedor)" as UC_Sys_GenerateIAResp
+        usecase "Manejar 'Tool Calling' de IA" as UC_Sys_HandleToolCall
+        usecase "Ejecutar Herramienta 'Escalar a Agente'" as UC_Sys_ExecEscalateTool
+        usecase "Persistir Mensaje" as UC_Sys_PersistMsg
+        usecase "Gestionar (Crear/Actualizar) Conversación" as UC_Sys_ManageConvDB
+        usecase "Validar Permisos de Acceso a Recursos" as UC_Sys_ValidatePerms
+        usecase "Notificar Agentes (Nuevo Chat Escalado)" as UC_Sys_NotifyAgentsEscalation
+        usecase "Notificar Clientes/Agentes (Actualizaciones de Chat por Sockets)" as UC_Sys_NotifyChatUpdates
+        usecase "Encriptar/Desencriptar API Keys" as UC_Sys_EncryptDecryptKeys
+        usecase "Validar y Emitir Tokens (Access/Refresh)" as UC_Sys_IssueTokens
+        usecase "Validar Refresh Token" as UC_Sys_ValidateRefreshToken
+        usecase "Almacenar/Invalidar Refresh Token" as UC_Sys_StoreRefreshToken
+    }
+}
+
+' --- Conexiones de Actores Principales a sus Paquetes/Casos de Uso ---
+Cliente -- UC_Register
+Cliente -- UC_LoginClient
+Cliente -- UC_RefreshToken
+Cliente -- UC_SocketConnect
+Cliente -- UC_SendUserMsg
+Cliente -- UC_SendIAMsg
+Cliente -- UC_MarkMsgReadClient
+Cliente -- UC_MarkConvReadClient
+Cliente -- UC_TypingClient
+Cliente -- UC_GetHistoryUserUser
+Cliente -- UC_GetHistoryUserIA
+Cliente -- UC_GetMyConvsClient
+Cliente -- UC_GetAIModelsClient
+Cliente -- UC_GetMe
+Cliente -- UC_Logout
+
+Agente -- UC_LoginAgent
+' Agente también accede a UC_SocketConnect, UC_RefreshToken, UC_GetMe, UC_Logout (heredado)
+Agente -- UC_AgentSendMsgToClient
+Agente -- UC_ViewPendingChats
+Agente -- UC_PickChatAgent
+Agente -- UC_CloseConvAgent
+Agente -- UC_AgentUpdateConvMeta
+Agente -- UC_AgentAddConvNote
+Agente -- UC_AgentPinConv
+Agente -- UC_GetHistoryAgentChat
+Agente -- UC_GetMyAssignedConvs
+
+Administrador -- UC_LoginAdmin
+' Admin también accede a todo lo de Agente (heredado)
+Administrador -- UC_AdminManageAIModels
+Administrador -- UC_AdminManageAPIKeys
+Administrador -- UC_AdminViewCosts
+Administrador -- UC_AdminViewAllConvs
+Administrador -- UC_AdminAssignAgentToConv
+Administrador -- UC_AdminManageUserRoles
+Administrador -- UC_AdminViewLogs
+
+
+' --- Relaciones <<include>> / <<extend>> (más selectivas para legibilidad) ---
+
+UC_SendUserMsg ----> UC_Sys_PersistMsg : <<include>>
+UC_SendIAMsg ----> UC_Sys_PersistMsg : <<include>>
+UC_AgentSendMsgToClient ----> UC_Sys_PersistMsg : <<include>>
+
+UC_SendIAMsg ----> UC_Sys_ProcessIAMsg : <<include>>
+UC_Sys_ProcessIAMsg ----> UC_Sys_GenerateIAResp : <<include>>
+UC_Sys_GenerateIAResp ----> UC_Sys_HandleToolCall : <<extend>>
+UC_Sys_HandleToolCall ----> UC_Sys_ExecEscalateTool : <<extend>>
+UC_Sys_ExecEscalateTool ----> UC_Sys_ManageConvDB : <<include>>
+UC_Sys_ExecEscalateTool ----> UC_Sys_NotifyAgentsEscalation : <<include>>
+UC_Sys_GenerateIAResp ----> UC_Sys_PersistMsg : <<include>> 'Respuesta de IA
+
+UC_PickChatAgent ----> UC_Sys_ManageConvDB : <<include>>
+UC_AdminAssignAgentToConv ----> UC_Sys_ManageConvDB : <<include>>
+UC_CloseConvAgent ----> UC_Sys_ManageConvDB : <<include>>
+
+' Autenticación y Tokens
+UC_LoginClient ----> UC_Sys_IssueTokens : <<include>>
+UC_LoginAgent ----> UC_Sys_IssueTokens : <<include>>
+UC_LoginAdmin ----> UC_Sys_IssueTokens : <<include>>
+UC_RefreshToken ----> UC_Sys_ValidateRefreshToken : <<include>>
+UC_Sys_ValidateRefreshToken ----> UC_Sys_IssueTokens : <<include>>
+UC_Sys_IssueTokens ----> UC_Sys_StoreRefreshToken : <<include>>
+UC_Logout ----> UC_Sys_StoreRefreshToken : <<include>> 'Para invalidar'
+
+
+' Conexiones a Actores del Sistema Interno
+UC_Sys_GenerateIAResp <|- Ext_AI_System
+UC_Sys_PersistMsg -|> DB_System
+UC_Sys_ManageConvDB -|> DB_System
+UC_Sys_NotifyAgentsEscalation -|> Notif_System
+UC_Sys_NotifyChatUpdates -|> Notif_System
+UC_Sys_EncryptDecryptKeys -|> Auth_System 
+UC_Sys_IssueTokens -|> Auth_System
+UC_Sys_ValidateRefreshToken -|> Auth_System
+UC_Sys_StoreRefreshToken -|> DB_System 
+
+' Conexiones a Validar Permisos (ejemplos, no exhaustivo para no saturar)
+UC_GetHistoryUserUser ..> UC_Sys_ValidatePerms : <<include>>
+UC_AdminViewAllConvs ..> UC_Sys_ValidatePerms : <<include>>
+UC_SocketConnect ..> Auth_System : <<include>> 'Auth de socket'
+
+' Casos de uso que comúnmente notifican a través de sockets
+UC_SendUserMsg ..> UC_Sys_NotifyChatUpdates
+UC_AgentSendMsgToClient ..> UC_Sys_NotifyChatUpdates
+UC_Sys_GenerateIAResp ..> UC_Sys_NotifyChatUpdates
+UC_PickChatAgent ..> UC_Sys_NotifyChatUpdates
+UC_CloseConvAgent ..> UC_Sys_NotifyChatUpdates
+
+
+note "Este diagrama está reorganizado para mayor claridad,\nagrupando casos de uso por actor principal y \nmostrando interacciones con operaciones internas del sistema." as MainNote
+@enduml

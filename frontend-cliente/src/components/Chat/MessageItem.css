@@ -1,0 +1,36 @@
+.message-item {
+  display: flex;
+  margin-bottom: 10px;
+  max-width: 70%;
+}
+
+.message-content {
+  padding: 10px 15px;
+  border-radius: 18px;
+  position: relative;
+  word-wrap: break-word;
+}
+
+.own-message {
+  margin-left: auto;
+}
+
+.own-message .message-content {
+  background-color: #DCF8C6;
+  color: #000;
+  border-bottom-right-radius: 5px;
+}
+
+.other-message .message-content {
+  background-color: #f1f0f0;
+  color: #000;
+  border-bottom-left-radius: 5px;
+}
+
+.message-time {
+  font-size: 0.7rem;
+  color: #999;
+  text-align: right;
+  display: block;
+  margin-top: 2px;
+}

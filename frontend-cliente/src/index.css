@@ -1,0 +1,64 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+@plugin "@midudev/tailwind-animations";
+
+/* Esto solo funciona si se descarga el font y se importa en el index.html */
+/* @font-face {
+  font-family: 'Outfit';
+  src: url('mi-ruta-de-fonts/Outfit-VariableFont_wdth\,wght.ttf');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+} */
+
+@theme {
+  --font-outfit: 'Outfit';
+  --color-azul-pastel: #49557e;
+  --color-tomato: oklch(75% 0.183 55.934);
+  --color-background-primary: #323232;
+}
+
+body{
+  @apply min-h-dvh ;
+}
+
+*{
+  @apply font-outfit;
+  scroll-behavior: smooth
+}
+
+a{
+  @apply text-inherit;
+}
+
+
+
+/* Scrollbar */
+
+body {
+  --sb-track-color: #ffffff;
+  --sb-thumb-color: #e96d1a;
+  --sb-size: 8px;
+}
+
+body::-webkit-scrollbar {
+  width: var(--sb-size)
+}
+
+body::-webkit-scrollbar-track {
+  background: var(--sb-track-color);
+  border-radius: 22px;
+}
+
+body::-webkit-scrollbar-thumb {
+  background: var(--sb-thumb-color);
+  border-radius: 22px;
+  
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  body {
+    scrollbar-color: var(--sb-thumb-color)
+                     var(--sb-track-color);
+  }
+}

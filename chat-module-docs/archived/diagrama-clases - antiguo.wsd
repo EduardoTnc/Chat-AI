@@ -1,0 +1,387 @@
+@startuml Diagrama_Clases_Backend_Chat_MERN
+
+
+title Diagrama de Clases del Backend (Módulo de Chat - MERN)
+
+' MARK: Core
+package "Core del Servidor" {
+    class Server {
+        + httpServer: http.Server
+        + io: SocketIOServer  <<Socket.IO>>
+        + app: ExpressApp     <<Express.js>>
+        + start()
+        + setupMiddleware()
+        + setupRoutes()
+        + setupSocketIO()
+    }
+    note right of Server
+        El corazón de la aplicación.
+        Orquesta Express para las API HTTP
+        y Socket.IO para la comunicación
+        en tiempo real.
+    end note
+}
+
+' MARK: Rutas API
+package "Gestión de Rutas API (Express.js)" {
+    class AuthRoutes {
+        + router: Express.Router
+        # authController: AuthController
+    }
+    note top of AuthRoutes : Para /api/auth/*
+
+    class ChatAPIRoutes {
+        + router: Express.Router
+        # chatController: ChatController
+        # aiController: AIController
+    }
+    note top of ChatAPIRoutes : Para /api/chats/* y /api/ai/* (historial, modelos)
+
+    class AdminAPIRoutes {
+        + router: Express.Router
+        # adminController: AdminController
+    }
+    note top of AdminAPIRoutes : Para /api/admin/*
+}
+
+' MARK: Controladores
+package "Controladores (Lógica de Peticiones HTTP)" {
+    class AuthController {
+        + login(req, res)
+        + register(req, res)
+        + getCurrentUser(req, res)
+    }
+    note top of AuthController
+        Maneja la autenticación 
+        y registro de usuarios.
+    end note
+
+    class ChatController {
+        + getConversationHistory(req, res)
+        + getConversations(req, res)
+    }
+    note top of ChatController
+        Provee datos para el chat que 
+        no son en tiempo real (vía HTTP).
+    end note
+
+    class AIController {
+        + getAvailableAIModels(req, res)
+        + getAIConversationHistory(req, res)
+    }
+    note top of AIController
+        Similar a ChatController, 
+        pero enfocado en la IA.
+    end note
+
+    class AdminController {
+        + getAIModelConfigs(req, res)
+        + updateAIModelConfig(req, res)
+        + setApiKey(req, res)
+        + getEscalatedChats(req, res)
+        + assignAgentToChat(req, res)
+        + getCostReport(req, res)
+    }
+    note top of AdminController
+        Funcionalidades para el panel 
+        de administración.
+    end note
+}
+
+' MARK: Manejadores de Socket.IO
+package "Manejadores de Socket.IO (Módulo de Chat - Tiempo Real)" {
+    class SocketManager {
+        + io: SocketIOServer
+        # messageService: MessageService
+        # aiService: AIService
+        # connectedUsers: Map<userId, socketId>
+        + constructor(io, messageService, aiService)
+        + initializeHandlers(socket)
+    }
+    note right of SocketManager
+        Orquestador principal para las conexiones Socket.IO.
+        Cuando un cliente se conecta, instancia los
+        manejadores específicos.
+        Mantiene un registro de usuarios conectados.
+    end note
+
+    abstract class BaseSocketHandler {
+        # socket: SocketIO.Socket
+        # io: SocketIOServer
+        # messageService: MessageService
+        # userId: string
+        # constructor(socket, io, messageService)
+        # abstract registerEvents(): void
+        # _emitError(errorMessage, details?): void
+        # _emitToSelf(event, payload): void
+        # _emitToUser(targetUserId, event, payload): void
+        # _broadcastToRoom(room, event, payload, excludeSelf?): void
+    }
+    note right of BaseSocketHandler
+        Clase base para compartir lógica común
+        entre manejadores de sockets (opcional, pero útil).
+    end note
+
+    class UserSocketHandler extends BaseSocketHandler {
+        + registerEvents()
+        # onSendMessageToUser(payload)
+        # onMarkAsRead(payload)
+        # onTyping(payload)
+    }
+    note bottom of UserSocketHandler : Eventos de chat entre usuarios.
+
+    class AISocketHandler extends BaseSocketHandler {
+        # aiService: AIService
+        + constructor(socket, io, messageService, aiService)
+        + registerEvents()
+        # onSendMessageToIA(payload)
+    }
+    note bottom of AISocketHandler : Eventos de chat con la IA.
+
+    class AgentSocketHandler extends BaseSocketHandler {
+        # AGENT_ROOM: string = "agents_room"
+        + registerEvents()
+        # onAgentConnect() 'Se une a AGENT_ROOM'
+        # onSendAgentMessageToUser(payload)
+        # onAgentPickedChat(payload) 'Cuando un agente toma un chat escalado'
+    }
+    note bottom of AgentSocketHandler
+        Eventos para agentes humanos:
+        - Comunicación con clientes.
+        - Gestión de chats escalados.
+    end note
+}
+
+' MARK: Servicios
+package "Servicios (Lógica de Negocio del Módulo de Chat)" {
+    class MessageService {
+        + createMessage(messageData): Promise<Message>
+        + getMessagesByConversationId(conversationId, paginationParams): Promise<Message[]>
+        + markMessageAsRead(messageId, readerId, conversationId): Promise<Message>
+        + getOrCreateConversation(participantsDetails): Promise<Conversation>
+        + assignAgentToConversation(conversationId, agentId): Promise<Conversation>
+        + getEscalatedConversations(status): Promise<Conversation[]>
+        + getConversationsForUser(userId, paginationParams): Promise<Conversation[]>
+        + processUserMessageToIA(userId, modelId, content, conversationId): Promise<Message>
+        + processIAResponse(userId, modelId, iaResponseContent, conversationId, usage?): Promise<Message>
+        + handleIAEscalationRequest(userId, conversationId, toolDetails): Promise<Message>
+    }
+    note top of MessageService
+        Lógica central para la gestión de mensajes
+        y conversaciones. Interactúa directamente
+        con los modelos de la base de datos.
+    end note
+
+    class AIService {
+        # ollamaProvider: IAIProvider
+        # openAIProvider: IAIProvider
+        # adminConfigService: AdminConfigService
+        + constructor(adminConfigService, ollamaUrl?, openAIApiKey?)
+        + fetchAvailableModels(userId): Promise<AIModelConfig[]>
+        + generateResponse(userId, modelId, content, conversationHistory): Promise<AIResponse>
+        + getSystemPrompt(modelId): Promise<string>
+    }
+    note top of AIService
+        Coordina la interacción con diferentes
+        proveedores de IA (Ollama, OpenAI).
+        Obtiene configuraciones (prompts, visibilidad)
+        del AdminConfigService.
+    end note
+
+    class AdminConfigService {
+        + getAllAIModelConfigs(): Promise<AIModelConfig[]>
+        + getAIModelConfig(modelId): Promise<AIModelConfig>
+        + updateAIModelConfig(modelId, config): Promise<AIModelConfig>
+        + saveApiKey(provider, apiKey): Promise<void>
+        + getApiKey(provider): Promise<string | null> 'Devuelve la key (desencriptada en memoria)'
+        + getApiKeyStatus(provider): Promise<{exists: boolean}>
+        + calculateCosts(provider, period): Promise<object> 'Detalles por definir'
+    }
+    note top of AdminConfigService
+        Maneja la configuración relacionada con la IA
+        que se gestiona desde el panel de admin.
+        Guarda y recupera API Keys de forma segura.
+    end note
+}
+
+' MARK: Proveedores de IA
+package "Proveedores de IA (Adaptadores para Modelos Externos)" {
+    interface IAIProvider {
+        <<interface>>
+        + generate(prompt: string, systemPrompt: string, history: object[], modelOptions: object): Promise<AIResponse>
+        + listModels?(): Promise<ModelInfo[]> 'Opcional, si el proveedor lo soporta'
+    }
+    class OllamaProvider implements IAIProvider {
+        - ollamaUrl: string
+        + constructor(ollamaUrl)
+        + generate(...)
+        + listModels()
+    }
+    class OpenAIProvider implements IAIProvider {
+        - apiKey: string
+        - openAI: OpenAI_SDK_Instance
+        + constructor(apiKey)
+        + generate(...)
+        + listModels()
+    }
+    class AIResponse {
+        + content: string
+        + toolCalls?: ToolCall[]
+        + usage?: { promptTokens: number, completionTokens: number }
+        + modelUsed?: string
+    }
+    class ToolCall {
+        + id: string 'Para OpenAI'
+        + type: string 'function'
+        + function: { name: string, arguments: string } 'Los argumentos vienen como JSON string'
+    }
+    class ModelInfo {
+        + id: string
+        + name: string
+    }
+    note bottom of IAIProvider
+        Abstracción para interactuar con diferentes
+        servicios de IA de manera uniforme.
+        AIService utiliza implementaciones de esta interfaz.
+    end note
+}
+
+' MARK: Modelos de Datos
+package "Modelos de Datos (Mongoose Schemas)" {
+    class User <<(M,orchid) Model>> {
+        + name: String
+        + email: String (unique)
+        + passwordHash: String
+        + role: Enum['user', 'admin', 'agent']
+        + createdAt: Date
+        + updatedAt: Date
+    }
+    class Message <<(M,orchid) Model>> {
+        + conversationId: ObjectId (ref: Conversation)
+        + senderId: ObjectId (ref: User)
+        + senderType: Enum['user', 'IA', 'agent']
+        + receiverId?: ObjectId (ref: User)
+        + receiverType?: Enum['user', 'IA', 'agent']
+        + content: String
+        + type: Enum['userQuery', 'IAResponse', 'userMessage', 'agentMessage', 'IAEscalationSignal', 'toolResult']
+        + modelId?: String
+        + read: Boolean
+        + readBy: [ObjectId (ref: User)]
+        + timestamp: Date (default: Date.now)
+        + usage?: { promptTokens: number, completionTokens: number }
+        + toolCallId?: string 'Para vincular la respuesta de una herramienta a su llamada'
+        + isError?: boolean 'Para respuestas de herramientas fallidas'
+    }
+    class Conversation <<(M,orchid) Model>> {
+        + participants: [ObjectId (ref: User)]
+        + type: Enum['user-to-user', 'user-to-ia', 'user-to-agent']
+        + lastMessage?: ObjectId (ref: Message)
+        + status: Enum['active', 'pending_agent', 'agent_active', 'closed_by_agent', 'closed_by_user']
+        + agentId?: ObjectId (ref: User)
+        + modelId?: String 'Para conversaciones con IA'
+        + unreadCounts?: [{ userId: ObjectId, count: Number }] 'Opcional para optimizar conteo de no leídos'
+        + createdAt: Date
+        + updatedAt: Date
+    }
+    class AIModelConfig <<(M,orchid) Model>> {
+        + modelId: String (unique) 'e.g., gpt-4, llama2:7b'
+        + provider: Enum['ollama', 'openai']
+        + name: String 'Nombre amigable'
+        + systemPrompt: String
+        + isVisibleToClient: Boolean
+        + apiIdentifier: String 'Nombre real del modelo para la API del proveedor'
+        + supportsTools: Boolean 'Indica si el modelo soporta "tools" o "function calling"'
+        + createdAt: Date
+        + updatedAt: Date
+    }
+    class ApiKeyStore <<(M,orchid) Model>> {
+         + provider: String (unique) 'e.g., "OpenAI", "Ollama_Enterprise"'
+         + apiKeyEncrypted: String
+         + lastUpdated: Date
+    }
+    note bottom of User
+        Los modelos representan la estructura
+        de los datos en MongoDB.
+        Mongoose los utiliza para interactuar
+        con la base de datos.
+        (M,orchid) es solo una nota visual de PlantUML.
+    end note
+}
+
+' MARK: Middleware
+package "Middleware (Express.js & Socket.IO)" {
+    class AuthMiddleware {
+        + protect(req, res, next)
+        + authorize(roles: string[]) (req, res, next)
+    }
+    note right of AuthMiddleware : Protege rutas API HTTP.
+
+    class SocketAuthMiddleware {
+        + authenticateSocket(socket, next)
+    }
+    note right of SocketAuthMiddleware : Valida tokens para conexiones Socket.IO.
+}
+
+' --- Relaciones Principales ---
+
+Server *-- "1" ExpressApp : uses
+Server *-- "1" SocketIOServer : uses
+Server o-- SocketManager : initializes >
+' El servidor tiene una instancia de SocketManager que inicializa al arrancar setupSocketIO
+
+' Rutas y Controladores
+AuthRoutes ..> AuthController : delegates to >
+ChatAPIRoutes ..> ChatController : delegates to >
+ChatAPIRoutes ..> AIController : delegates to >
+AdminAPIRoutes ..> AdminController : delegates to >
+
+' Controladores y Servicios
+ChatController ..> MessageService : uses >
+AIController ..> AIService : uses >
+AIController ..> MessageService : uses > 'Para guardar mensajes de IA'
+AdminController ..> AdminConfigService : uses >
+AdminController ..> MessageService : uses > 'Para chats escalados'
+AdminController ..> AIService : uses > 'Para costos (indirectamente)'
+
+' Socket Manager y Handlers
+SocketManager o-- BaseSocketHandler : creates instances of >
+' SocketManager crea instancias de UserSocketHandler, AISocketHandler, AgentSocketHandler
+' que heredan de BaseSocketHandler. Por simplicidad, no se dibujan todas las flechas de creación.
+
+' Handlers y Servicios
+UserSocketHandler ..> MessageService : uses for chat ops >
+AISocketHandler ..> MessageService : uses for IA chat ops >
+AISocketHandler ..> AIService : uses for IA logic >
+AgentSocketHandler ..> MessageService : uses for agent chat ops >
+
+' Servicios y Proveedores/Modelos
+MessageService ..> Message : CRUD ops on >
+MessageService ..> Conversation : CRUD ops on >
+AIService o-- IAIProvider : uses >
+AIService ..> AdminConfigService : gets config from >
+AIService ..> AIModelConfig : reads >
+AdminConfigService ..> AIModelConfig : CRUD ops on >
+AdminConfigService ..> ApiKeyStore : CRUD ops on >
+
+' Middleware
+AuthMiddleware ..> User : checks >
+SocketAuthMiddleware ..> User : checks >
+
+' Relaciones entre modelos (referencias)
+Message -- Conversation : conversationId (FK) >
+Message -- User : senderId (FK) >
+Message -- User : receiverId (FK, optional) >
+Conversation -- User : participants (FK array) >
+Conversation -- Message : lastMessage (FK, optional) >
+Conversation -- User : agentId (FK, optional) >
+
+legend
+  |= Icon |= Significado |
+  | <&pulse> | Indica tiempo real / Socket.IO |
+  | <&key> | Relacionado con autenticación/autorización |
+  | <&cog> | Configuración o servicio interno |
+  | <&cloud> | Interacción con servicio externo (IA) |
+  | <&database> | Modelo de Base de Datos (Mongoose) |
+end legend
+
+@enduml

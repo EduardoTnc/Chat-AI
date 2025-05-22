@@ -1,0 +1,450 @@
+@startuml Diagrama_Clases_Backend_Chat_MERN_Actualizado
+
+title Diagrama de Clases del Backend (Módulo de Chat - MERN) - ACTUALIZADO
+
+' MARK: Core
+package "Core del Servidor" {
+    class Server {
+        + httpServer: http.Server
+        + io: SocketIOServer  <<Socket.IO>>
+        + app: ExpressApp     <<Express.js>>
+        + start()
+        + setupMiddleware()  // Incluye Morgan, CORS, CookieParser
+        + setupRoutes()
+        + setupSocketIO()    // Inicializa SocketManager
+    }
+    note right of Server
+        Orquesta Express (APIs HTTP) y Socket.IO (tiempo real).
+        Gestiona middleware global y arranque.
+    end note
+}
+
+' MARK: Rutas API
+package "Gestión de Rutas API (Express.js)" {
+    class AuthRoutes {
+        + router: Express.Router
+        # authController: AuthController
+    }
+    note top of AuthRoutes : /api/v1/auth (login, register, refresh, logout, me)
+
+    class ChatAPIRoutes { 
+        + router: Express.Router
+        # chatController: ChatController
+    }
+    note top of ChatAPIRoutes : /api/v1/chat-api (historial de usuario, marcar leído)
+
+    class AIApiRoutes { 
+        + router: Express.Router
+        # aiController: AIController
+    }
+    note top of AIApiRoutes : /api/v1/ai-api (modelos IA, historial IA, marcar leído IA)
+
+    class AdminAPIRoutes {
+        + router: Express.Router
+        # adminController: AdminController
+    }
+    note top of AdminAPIRoutes : /api/v1/admin-api (gestión de configs, conversaciones, agentes)
+}
+
+' MARK: Controladores
+package "Controladores (Lógica de Peticiones HTTP)" {
+    class AuthController {
+        + register(req, res, next)  // Solo para rol 'user'
+        + login(req, res, next)
+        + refreshToken(req, res, next)
+        + logout(req, res, next)
+        + getCurrentUser(req, res, next)
+    }
+
+    class ChatController {
+        + getUserConversations(req, res, next)
+        + getMessagesForConversation(req, res, next)
+        + markUserConversationAsRead(req, res, next)
+    }
+
+    class AIController {
+        + getAvailableAIModelsForClient(req, res, next)
+        + getAIConversationMessages(req, res, next)
+        + markAIChatAsRead(req, res, next)
+    }
+
+    class AdminController {
+        // AI Model Configs
+        + getAllAIModelConfigsCtrl(req, res, next)
+        + createAIModelConfigCtrl(req, res, next)
+        + getAIModelConfigByInternalIdCtrl(req, res, next)
+        + updateAIModelConfigCtrl(req, res, next)
+        + deleteAIModelConfigCtrl(req, res, next)
+        // API Keys
+        + getAllApiKeyStatusesCtrl(req, res, next)
+        + saveApiKeyCtrl(req, res, next)
+        + getApiKeyStatusCtrl(req, res, next)
+        + deleteApiKeyCtrl(req, res, next)
+        // Costs
+        + getCostReportCtrl(req, res, next)
+        // Conversation Management
+        + getAllConversations(req, res, next) // getAllConversationsForAdmin
+        + getConversationDetailsForAdmin(req, res, next)
+        + updateConversationMetadataByAdmin(req, res, next)
+        + addNoteToConversationByAdmin(req, res, next)
+        + pinConversationByAdmin(req, res, next)
+        + unpinConversationByAdmin(req, res, next)
+        // Agent & Escalation
+        + assignAgentToChatCtrl(req, res, next)
+        + getEscalatedChatsCtrl(req, res, next)
+    }
+    note top of AdminController
+        Maneja todas las operaciones
+        del panel de administración.
+    end note
+}
+
+' MARK: Manejadores de Socket.IO
+package "Manejadores de Socket.IO (Módulo de Chat - Tiempo Real)" {
+    class SocketManager <<(Orchestrator)>> {
+        + io: SocketIOServer
+        # messageService: MessageService
+        # aiService: AIService
+        # adminConfigService: AdminConfigService
+        # connectedUsers: Map<userId, Set<socketId>>
+        + constructor(io) // Servicios se instancian internamente o se inyectan
+        + initializeSocketIO() // Registra middleware de auth y 'connection'
+        # _onConnection(socket) // Lógica al conectar un nuevo socket
+    }
+    note right of SocketManager
+        Orquestador de conexiones Socket.IO.
+        Autentica sockets.
+        Instancia Handlers por conexión.
+        Gestiona `connectedUsers` y salas.
+    end note
+
+    class UserSocketHandler {
+        # socket: SocketIO.Socket
+        # io: SocketIOServer
+        # messageService: MessageService
+        # user: User // Usuario autenticado del socket
+        # connectedUsers: Map
+        + constructor(socket, io, messageService, connectedUsers)
+        + registerUserEvents()
+        # handleSendMessageToUser(payload, ack)
+        # handleMarkMessageAsRead(payload, ack) // Marca un mensaje específico como leído por el usuario
+        # handleTyping(payload)
+        # handleFetchInitialConversations(payload, ack)
+        # _handleErrorWrapper(handlerFn)
+    }
+
+    class AISocketHandler {
+        # socket: SocketIO.Socket
+        # io: SocketIOServer
+        # messageService: MessageService
+        # aiService: AIService
+        # user: User
+        # connectedUsers: Map
+        + constructor(socket, io, messageService, aiService, connectedUsers)
+        + registerAIEvents()
+        # handleSendMessageToIA(payload, ack)
+        # handleFetchAIModels(payload, ack)
+        # _handleErrorWrapper(handlerFn)
+    }
+
+    class AgentSocketHandler {
+        # socket: SocketIO.Socket
+        # io: SocketIOServer
+        # messageService: MessageService
+        # user: User // Agente/Admin autenticado
+        # connectedUsers: Map
+        # AGENT_ROOM: string
+        # ADMIN_ROOM: string
+        + constructor(socket, io, messageService, connectedUsers, agentRoom, adminRoom)
+        + registerAgentEvents()
+        # handleAgentSendMessageToUser(payload, ack)
+        # handleAgentPickChat(payload, ack)
+        # handleAgentUpdateConversationMetadata(payload, ack)
+        # handleAgentAddNote(payload, ack)
+        # handleAgentPinConversation(payload, ack)
+        # handleAgentUnpinConversation(payload, ack)
+        # handleAgentCloseConversation(payload, ack)
+        # _handleErrorWrapper(handlerFn)
+    }
+}
+
+' MARK: Servicios
+package "Servicios (Lógica de Negocio)" {
+    class MessageService {
+        # _validateConversationAccess(conversationId, userId, userRole, checkStatusNotClosed?)
+        + getConversationById(conversationId, userId, userRole): Promise<Conversation>
+        + getMessagesByConversationId(conversationId, requestingUser, pagination): Promise<Message[]>
+        + getConversationsForUser(userId, pagination): Promise<object>
+        + getAllConversationsForAdmin(paginationAndFilters, requestingUser): Promise<object>
+        + createMessage(messageData, requestingUser): Promise<Message>
+        + markMessageAsRead(messageId, readerId, conversationId, requestingUser): Promise<Message> // Simplificado
+        + markConversationAsRead(conversationId, readerId, requestingUser): Promise<Conversation>
+        + escalateConversationToAgent(conversationId, userId, reason, urgency, escalatedByTool, requestingUser): Promise<Conversation>
+        + assignAgentToConversation(conversationId, agentIdToAssign, requestingUser): Promise<Conversation>
+        + getEscalatedConversations(requestingUser, status?): Promise<Conversation[]>
+        + updateConversationMetadata(conversationId, requestingUser, metadataUpdates): Promise<Conversation>
+        + addNoteToConversation(conversationId, requestingUser, noteContent): Promise<Conversation>
+        + pinConversation(conversationId, requestingUser): Promise<Conversation>
+        + unpinConversation(conversationId, requestingUser): Promise<Conversation>
+    }
+    note top of MessageService
+        Lógica central para mensajes y conversaciones.
+        Maneja permisos de acceso a conversaciones.
+        Interactúa con modelos Message y Conversation.
+    end note
+
+    class AIService {
+        # adminConfigService: AdminConfigService
+        # messageService: MessageService
+        # providers: Map<string, IAIProvider>
+        # ollamaProvider?: IAIProvider
+        # openAIProvider?: IAIProvider
+        + constructor(adminConfigService, messageService)
+        # _getProviderInstance(providerName, modelApiIdentifier): Promise<IAIProvider>
+        + fetchAvailableModels(userId, userRole): Promise<AIModelConfigInfo[]>
+        # _prepareConversationHistoryForProvider(conversationId, providerName, limit?): Promise<object[]>
+        + generateResponse(requestingUser, clientModelId, userMessageContent, conversationId): Promise<{finalMessage: Message, originalToolCallingMessage?: Message}>
+        # handleEscalationTool(requestingUser, conversationId, args): Promise<string>
+        # _getToolDefinitions(providerName, clientModelId): object[] | undefined
+    }
+    note top of AIService
+        Orquesta interacciones con proveedores de IA.
+        Maneja el flujo de tool calling.
+        Obtiene configuración de AdminConfigService.
+        Usa MessageService para persistir y escalar.
+    end note
+
+    class AdminConfigService {
+        // AI Model Configs
+        + getAllAIModelConfigs(): Promise<AIModelConfig[]>
+        + getAIModelConfig(modelId): Promise<AIModelConfig | null> // Por modelId de sistema
+        + getAIModelConfigByInternalId(internalId): Promise<AIModelConfig> // Por _id de mongo
+        + createAIModelConfig(configData): Promise<AIModelConfig>
+        + updateAIModelConfig(internalId, updateData): Promise<AIModelConfig>
+        + deleteAIModelConfig(internalId): Promise<{message: string}>
+        // API Keys
+        # _encryptApiKey(plainKey): string
+        # _decryptApiKey(cipherText): string | null
+        + saveApiKey(provider, plainApiKey, description?): Promise<object>
+        + getApiKey(provider): Promise<string | null>
+        + getApiKeyStatus(provider): Promise<object>
+        + getAllApiKeyStatus(): Promise<object[]>
+        + deleteApiKey(provider): Promise<{message: string}>
+        // Costs
+        + calculateCosts(provider, periodOptions): Promise<object>
+    }
+    note top of AdminConfigService
+        Gestión de configuraciones de IA (modelos, API keys).
+        Encriptación de API keys.
+        Cálculo de costos (placeholder).
+    end note
+}
+
+' MARK: Proveedores de IA
+package "Proveedores de IA (Adaptadores)" {
+    interface IAIProvider {
+        <<interface>>
+        + generate(messages: object[], systemPrompt: string, modelApiIdentifier: string, modelOptions: object): Promise<AIResponse>
+        + listModels?(): Promise<ModelInfo[]>
+    }
+    class OllamaProvider implements IAIProvider {
+        - baseUrl: string
+        + constructor(baseUrl)
+        + generate(messages, systemPrompt, modelApiIdentifier, modelOptions)
+        + listModels()
+    }
+    class OpenAIProvider implements IAIProvider {
+        - apiKey: string
+        - openAI: OpenAI_SDK_Instance
+        + constructor(apiKey)
+        + generate(messages, systemPrompt, modelApiIdentifier, modelOptions)
+        + listModels()
+    }
+    class AIResponse {
+        + content: string
+        + toolCalls?: ToolCall[]
+        + usage?: { promptTokens: number, completionTokens: number }
+        + modelUsed?: string
+    }
+    class ToolCall {
+        + id: string
+        + type: string
+        + function: { name: string, arguments: string }
+    }
+    class ModelInfo {
+        + id: string
+        + name: string
+    }
+}
+
+class RefreshTokenSchema {
+    + token: String
+    + createdAt: Date
+    + expiresAt: Date
+}
+
+class NoteSchema {
+    + userId: ObjectId (ref: User)
+    + note: String
+    + createdAt: Date
+}
+
+class UnreadCountSchema {
+    + userId: ObjectId (ref: User)
+    + count: Number
+}
+
+class PinnedSchema {
+    + userId: ObjectId (ref: User)
+    + pinnedAt: Date
+}
+
+class EscalationDetailsSchema {
+    + reason: String
+    + urgency: Enum['low', 'medium', 'high', null]
+    + escalatedByTool: Boolean
+    + escalationTimestamp: Date
+}
+
+' MARK: Modelos de Datos
+package "Modelos de Datos (Mongoose Schemas)" {
+    class User <<(M,orchid) Model>> {
+        + name: String
+        + email: String (unique)
+        + passwordHash: String
+        + role: Enum['user', 'admin', 'agent']
+        + refreshTokens: [RefreshTokenSchema]
+        + createdAt: Date
+        + updatedAt: Date
+        + comparePassword(password): Promise<boolean>
+        + cleanupRefreshTokens(): Promise<void>
+    }
+
+    class Message <<(M,orchid) Model>> {
+
+        + conversationId: ObjectId (ref: Conversation)
+        + senderId?: ObjectId (ref: User) // Opcional para IA, tool, system
+        + senderType: Enum
+        + content: String
+        + type: Enum
+        + readBy: [ObjectId (ref: User)]
+        + toolCalls?: [object]
+        + toolCallId?: string
+
+    }
+    class Conversation <<(M,orchid) Model>> {
+        + participants: [ObjectId (ref: User)]
+        + type: Enum['user-to-user', 'user-to-ia', 'user-to-agent']
+        + lastMessage?: ObjectId (ref: Message)
+        + status: Enum['active', 'pending_agent', 'agent_active', 'closed_by_agent', 'closed_by_user', 'archived']
+        + agentId?: ObjectId (ref: User)
+        + modelId?: String
+        + unreadCounts?: [UnreadCountSchema]
+        + metadata?: {
+            title?: String,
+            pinnedBy?: [PinnedSchema],
+            escalationDetails?: EscalationDetailsSchema,
+            tags?: [String],
+            priority?: Enum['low', 'normal', 'high', 'urgent', null],
+            notes?: [NoteSchema],
+            clientInfo?: {
+                device: String,
+                browser: String,
+                pageUrl: String,}}
+        + createdAt: Date
+        + updatedAt: Date
+        + updateUnreadCount(recipientId, increment?): Promise<void>
+    }
+    class AIModelConfig <<(M,orchid) Model>> {
+        + _id: ObjectId
+        + name: String
+        + description: String
+        + modelApiIdentifier: String
+        + provider: Enum['ollama', 'openai']
+        + createdAt: Date
+        + updatedAt: Date
+    }
+    class ApiKeyStore <<(M,orchid) Model>> {
+        + _id: ObjectId
+        + provider: Enum['ollama', 'openai']
+        + apiKey: String
+        + createdAt: Date
+        + updatedAt: Date
+    }
+
+    note bottom of User
+        Modelos de Mongoose con Schemas detallados.
+        Conversation ahora incluye un objeto `metadata` rico.
+        User incluye `refreshTokens`.
+    end note
+}
+
+' MARK: Middleware
+package "Middleware (Express.js & Socket.IO)" {
+    class AuthMiddleware <<(HTTP)>> {
+        + protect(req, res, next)               // Valida Access Token
+        + authorize(...roles) (req, res, next)  // Valida Roles
+    }
+    class SocketAuthMiddleware <<(Socket.IO)>> {
+        + authenticateSocket(socket, next)      // Valida token en handshake de socket
+    }
+    class ErrorHandlerMiddleware <<(HTTP)>> {
+        + errorHandlerMiddleware(err, req, res, next) // Manejador global de errores API
+        + notFoundMiddleware(req, res, next)          // Para rutas 404
+    }
+    class ApiError <<(HTTP)>> {
+        + statusCode: number
+        + errors?: object[]
+        + constructor(statusCode, message, errors?)
+    }
+}
+
+' --- Relaciones Principales (Simplificadas para claridad) ---
+Server o-- SocketManager
+SocketManager ..> UserSocketHandler : creates
+SocketManager ..> AISocketHandler : creates
+SocketManager ..> AgentSocketHandler : creates
+
+AuthRoutes ..> AuthController
+ChatAPIRoutes ..> ChatController
+AIApiRoutes ..> AIController
+AdminAPIRoutes ..> AdminController
+
+AuthController ..> User : auth ops
+ChatController ..> MessageService
+AIController ..> AIService
+AIController ..> MessageService : for initial user message
+AdminController ..> MessageService
+AdminController ..> AdminConfigService
+AdminController ..> AIService : (indirectly via AdminConfigService for models)
+
+UserSocketHandler ..> MessageService
+AISocketHandler ..> AIService
+AISocketHandler ..> MessageService : for user message & IA response persistence
+AgentSocketHandler ..> MessageService
+
+MessageService ..> Message : CRUD
+MessageService ..> Conversation : CRUD
+AIService o-- IAIProvider
+AIService ..> AdminConfigService : uses
+AIService ..> MessageService : for tool results, escalation state
+AdminConfigService ..> AIModelConfig : CRUD
+AdminConfigService ..> ApiKeyStore : CRUD
+
+AuthMiddleware ..> User
+SocketAuthMiddleware ..> User
+ErrorHandlerMiddleware ..> ApiError : handles
+
+' Modelo -> Modelo (Referencias)
+Message o-- Conversation
+Message o-- User : (senderId)
+Conversation o-- User : (participants, agentId)
+Conversation o-- Message : (lastMessage)
+User o-- "0..*" RefreshTokenSchema : (embeds)
+Conversation o-- "0..*" UnreadCountSchema : (embeds)
+Conversation o-- "0..1" EscalationDetailsSchema : (embeds in metadata)
+Conversation o-- "0..*" PinnedSchema : (embeds in metadata)
+Conversation o-- "0..*" NoteSchema : (embeds in metadata)
+' ... otras relaciones de embedding en metadata
+
+@enduml

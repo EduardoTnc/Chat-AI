@@ -1,0 +1,288 @@
+' MARK: Mensajeria Clientes
+@startuml Diagrama_Secuencia_Mensajeria_Clientes
+header Mensajería entre Clientes (Socket.IO)
+
+actor "Cliente A" as ClienteA
+participant "Frontend (Cliente A)" as FrontendA
+participant "Socket.IO Client (Cliente A)" as SocketClientA
+
+actor "Cliente B" as ClienteB
+participant "Frontend (Cliente B)" as FrontendB
+participant "Socket.IO Client (Cliente B)" as SocketClientB
+
+participant "Socket.IO Server" as SocketServer
+participant "Servicio de Mensajería" as MsgService
+participant "Base de Datos (Adaptador)" as DBAdapter
+
+group Conexión Inicial y Autenticación
+    ClienteA -> FrontendA: Inicia sesión / Abre chat
+    FrontendA -> SocketClientA: connect() con token de autenticación
+    SocketClientA -> SocketServer: "connect" { authToken }
+    SocketServer -> SocketServer: Valida token (puede delegar a servicio de Auth del host)
+    SocketServer -> DBAdapter: getOrCreateUser(userId)
+    DBAdapter --> SocketServer: Datos de usuario
+    SocketServer --> SocketClientA: "connected" { userId }
+    note right of SocketServer: Almacena asociación userId <-> socketId
+end group
+
+group Mensajería entre usuarios
+    ClienteA -> FrontendA: Escribe un mensaje a ClienteB
+    FrontendA -> SocketClientA: emit("typing", { receiverId: ClienteB.id })
+    SocketClientA -> SocketServer: "typing" { receiverId }
+    SocketServer -> MsgService: handleTyping(senderId, receiverId)
+    MsgService -> SocketServer: Busca socketId del receptor (ClienteB.id)
+    alt Receptor (ClienteB) online
+        SocketServer --> SocketClientB: emit("userTyping", { senderId: ClienteA.id })
+        SocketClientB --> FrontendB: "userTyping"
+        FrontendB -> ClienteB: Muestra "Cliente A está escribiendo..."
+    end
+
+    ClienteA -> FrontendA: Envía mensaje
+    FrontendA -> SocketClientA: emit("sendMessageToUser", { receiverId: ClienteB.id, content })
+    SocketClientA -> SocketServer: "sendMessageToUser" { receiverId, content }
+    SocketServer -> MsgService: processUserMessage(senderId, receiverId, content)
+    MsgService -> DBAdapter: saveMessage({ senderId, receiverId, content, type: 'user' })
+    DBAdapter --> MsgService: Mensaje guardado (con messageId)
+
+    alt Receptor (ClienteB) online
+        MsgService -> SocketServer: Busca socketId del receptor (ClienteB.id)
+        SocketServer --> SocketClientB: emit("newMessage", { message })
+        SocketClientB --> FrontendB: "newMessage"
+        FrontendB -> ClienteB: Muestra notificación y mensaje
+    end
+
+    SocketServer --> SocketClientA: emit("messageSent", { message })
+    SocketClientA --> FrontendA: "messageSent"
+    FrontendA -> ClienteA: Muestra confirmación y mensaje enviado
+
+    ClienteB -> FrontendB: Lee mensaje
+    FrontendB -> SocketClientB: emit("markAsRead", { messageId })
+    SocketClientB -> SocketServer: "markAsRead" { messageId }
+    SocketServer -> MsgService: markMessageAsRead(messageId, readerId)
+    MsgService -> DBAdapter: updateMessageStatus(messageId, { read: true })
+    DBAdapter --> MsgService: Confirmación
+    SocketServer --> SocketClientA: emit("messageMarkedAsRead", { messageId, readerId: ClienteB.id })
+    SocketClientA --> FrontendA: "messageMarkedAsRead"
+    FrontendA -> ClienteA: Actualiza estado del mensaje (ej. doble check azul)
+end
+@enduml
+
+' MARK: Chat IA
+@startuml Diagrama_Secuencia_Chat_IA_Modificado
+header Chat con Asistente IA (Socket.IO para tiempo real, HTTP para cargas)
+
+actor "Cliente" as Cliente
+participant "Frontend (Cliente)" as Frontend
+participant "Socket.IO Client" as SocketClient
+participant "Socket.IO Server" as SocketServer
+participant "API Router (Backend)" as APIRouter
+participant "Auth Middleware" as Auth
+participant "AIAssistantController" as AICtrl
+participant "Servicio de Asistente IA" as IAService
+participant "Servicio de Mensajería" as MsgService
+participant "Proveedor IA (Ollama/OpenAI)" as IAProvider
+participant "Base de Datos (MongoDB/Mongoose)" as DB
+
+group Inicio de Chat con IA (Carga de Modelos vía HTTP)
+    Cliente -> Frontend: Navega a chat con asistente
+    Frontend -> APIRouter: GET /api/ai/models 
+    APIRouter -> Auth: Verifica token JWT (si es necesario para esta ruta)
+    Auth --> APIRouter: Usuario autenticado (o acceso permitido)
+    APIRouter -> AICtrl: getAvailableModels(req, res)
+    AICtrl -> IAService: fetchAvailableModels(userId) 'userId para filtrar modelos visibles'
+    IAService -> DB: getAIModelConfigurations()
+    DB --> IAService: Configuraciones de modelos (visibilidad, prompts)
+    IAService --> AICtrl: Lista de modelos visibles para el usuario
+    AICtrl --> APIRouter: Respuesta JSON con modelos
+    APIRouter --> Frontend: Modelos disponibles
+    Frontend -> Cliente: Muestra selector de modelo
+end group
+
+group Envío de Mensaje a IA (Vía Socket.IO)
+    Cliente -> Frontend: Selecciona modelo y envía mensaje
+    Frontend -> SocketClient: emit("sendMessageToIA", { modelId, content, conversationId (opcional) })
+    SocketClient -> SocketServer: "sendMessageToIA" { userId, modelId, content, conversationId }
+
+    SocketServer -> MsgService: processUserMessageToIA(userId, modelId, content, conversationId)
+    MsgService -> DB: saveMessage({ senderId: userId, receiverType: 'IA', modelId, content, type: 'userQuery' })
+    DB --> MsgService: Mensaje de usuario guardado (messageUser)
+    SocketServer --> SocketClient: emit("userMessageToIASent", { message: messageUser }) 'Confirmación opcional'
+
+    MsgService -> IAService: generateResponse(userId, modelId, content, conversationHistory)
+    IAService -> DB: getSystemPrompt(modelId)
+    DB --> IAService: System Prompt
+    IAService -> IAProvider: Envía request (prompt usuario + system prompt + historial)
+    IAProvider --> IAService: Respuesta del modelo (puede incluir "tool_calls")
+
+    alt Respuesta IA con Solicitud de Herramienta (Escalada)
+        IAService -> IAService: Detecta "tool_call" para escalar
+        IAService -> MsgService: handleIAEscalationRequest(userId, conversationId, toolDetails)
+        MsgService -> DB: saveMessage({ senderId: 'IA', modelId, content: "Te conectaré con un agente.", type: 'IAEscalationSignal' })
+        DB --> MsgService: Mensaje de señal de escalada guardado
+        MsgService -> DB: updateConversationStatus(conversationId, { status: 'pending_agent' })
+        DB --> MsgService: Estado de conversación actualizado
+        SocketServer -> SocketServer: emitToRoom("agents_room", "newEscalatedChat", { conversationId })
+        MsgService -> SocketServer: Prepara mensaje para el cliente
+        SocketServer --> SocketClient: emit("newMessage", { message: "Te conectaré con un agente humano." })
+    else Respuesta IA Normal
+        IAService -> MsgService: processIAResponse(userId, modelId, iaResponseContent, conversationId)
+        MsgService -> DB: saveMessage({ senderId: 'IA', modelId, content: iaResponseContent, type: 'IAResponse' })
+        DB --> MsgService: Respuesta IA guardada (messageIA)
+        MsgService -> SocketServer: Prepara mensaje para el cliente
+        SocketServer --> SocketClient: emit("newMessage", { message: messageIA })
+    end
+
+    SocketClient --> Frontend: "newMessage"
+    Frontend -> Cliente: Muestra respuesta de la IA (o mensaje de escalada)
+end group
+
+group Solicitar Historial de Chat con IA (Vía HTTP)
+    Cliente -> Frontend: Abre chat con IA (o scroll up para cargar más historial)
+    Frontend -> APIRouter: GET /api/ai/conversations/{conversationId}/history?modelId={modelId}&before={timestamp_o_cursor} 'Petición HTTP'
+    APIRouter -> Auth: Verifica token
+    Auth --> APIRouter: Usuario autenticado
+    APIRouter -> AICtrl: getAssistantConversationHistory(req, res)
+    AICtrl -> MsgService: fetchIAConversationHistory(userId, conversationId, modelId, paginationParams)
+    MsgService -> DB: getMessagesForConversation(conversationId, modelId, paginationParams)
+    DB --> MsgService: Mensajes
+    ' Opcional: marcar mensajes como leídos por el usuario si aplica (podría ser una acción separada o parte de esto)'
+    MsgService --> AICtrl: Historial de mensajes
+    AICtrl --> APIRouter: Respuesta JSON con historial
+    APIRouter --> Frontend: Historial de mensajes
+    Frontend -> Cliente: Muestra historial
+end group
+@enduml
+
+' MARK: Agente Humano
+@startuml Diagrama_Secuencia_Agente_Humano
+header Agente Humano Atendiendo Chat Escalado
+
+actor "Agente Humano" as Agent
+participant "Frontend Admin Panel (Agente)" as AdminFrontend
+participant "Socket.IO Client (Agente)" as AgentSocketClient
+participant "Backend API (Admin)" as AdminAPI
+participant "Socket.IO Server" as SocketServer
+participant "Servicio de Mensajería" as MsgService
+participant "Base de Datos (Adaptador)" as DBAdapter
+
+actor "Cliente" as Cliente
+participant "Frontend (Cliente)" as ClientFrontend
+participant "Socket.IO Client (Cliente)" as ClientSocketClient
+
+group Agente se Conecta y Ve Chats Escalados
+    Agent -> AdminFrontend: Inicia sesión en panel de admin
+    AdminFrontend -> AgentSocketClient: connect() con token de agente
+    AgentSocketClient -> SocketServer: "connect_agent" { agentAuthToken }
+    SocketServer -> SocketServer: Valida token agente, une a "agents_room"
+    SocketServer --> AgentSocketClient: "agent_connected"
+
+    AdminFrontend -> AdminAPI: GET /api/admin/escalated-chats?status=pending_agent
+    AdminAPI -> MsgService: getEscalatedConversations("pending_agent")
+    MsgService -> DBAdapter: findConversationsByStatus("pending_agent")
+    DBAdapter --> MsgService: Lista de conversaciones
+    MsgService --> AdminAPI: Conversaciones
+    AdminAPI --> AdminFrontend: Lista de chats pendientes
+    AdminFrontend -> Agent: Muestra lista de chats
+end group
+
+group Agente Atiende un Chat
+    Agent -> AdminFrontend: Selecciona un chat para atender (conversationId)
+    AdminFrontend -> AdminAPI: POST /api/admin/chats/{conversationId}/assign (body: { agentId })
+    AdminAPI -> MsgService: assignAgentToConversation(conversationId, agentId)
+    MsgService -> DBAdapter: updateConversationStatus(conversationId, { status: 'agent_active', agentId })
+    DBAdapter --> MsgService: Confirmación
+    MsgService -> SocketServer: Notifica al cliente que un agente se unió
+    SocketServer --> ClientSocketClient: emit("agentJoinedChat", { agentName, conversationId })
+    ClientSocketClient --> ClientFrontend: "agentJoinedChat"
+    ClientFrontend -> Cliente: Muestra "Agente X se ha unido al chat."
+    AdminAPI --> AdminFrontend: Confirmación, carga historial del chat seleccionado
+    AdminFrontend -> Agent: Muestra interfaz de chat con el cliente
+
+    Agent -> AdminFrontend: Escribe mensaje al cliente
+    AdminFrontend -> AgentSocketClient: emit("sendAgentMessageToUser", { conversationId, recipientUserId, content })
+    AgentSocketClient -> SocketServer: "sendAgentMessageToUser" { agentId, conversationId, recipientUserId, content }
+    SocketServer -> MsgService: processAgentMessage(agentId, recipientUserId, content, conversationId)
+    MsgService -> DBAdapter: saveMessage({ senderId: agentId, senderType: 'agent', receiverId: recipientUserId, content, type: 'agentMessage', conversationId })
+    DBAdapter --> MsgService: Mensaje guardado
+    MsgService -> SocketServer: Busca socketId del cliente (recipientUserId)
+    SocketServer --> ClientSocketClient: emit("newMessage", { message }) 'Mensaje del agente'
+    ClientSocketClient --> ClientFrontend: "newMessage"
+    ClientFrontend -> Cliente: Muestra mensaje del agente
+    ' Opcional: confirmar al agente que el mensaje fue enviado/recibido'
+    SocketServer --> AgentSocketClient: emit("agentMessageSent", { message })
+end group
+
+group Cliente Responde al Agente
+    Cliente -> ClientFrontend: Escribe respuesta al agente
+    ClientFrontend -> ClientSocketClient: emit("sendMessageToAgent", { conversationId, agentId, content })
+    ClientSocketClient -> SocketServer: "sendMessageToAgent" { userId, conversationId, agentId, content }
+    SocketServer -> MsgService: processUserMessageToAgent(userId, agentId, content, conversationId)
+    MsgService -> DBAdapter: saveMessage({ senderId: userId, receiverId: agentId, receiverType: 'agent', content, type: 'userMessage', conversationId })
+    DBAdapter --> MsgService: Mensaje guardado
+    MsgService -> SocketServer: Busca socketId del agente (agentId)
+    SocketServer --> AgentSocketClient: emit("newMessage", { message }) 'Mensaje del cliente'
+    AgentSocketClient --> AdminFrontend: "newMessage"
+    AdminFrontend -> Agent: Muestra mensaje del cliente
+end group
+@enduml
+
+' MARK: Admin Config
+@startuml Diagrama_Secuencia_Admin_Config
+header Configuración del Administrador
+
+actor "Administrador" as Admin
+participant "Frontend Admin Panel" as AdminFrontend
+participant "Backend API (Admin)" as AdminAPI
+participant "Servicio de Configuración IA" as IAConfigService
+participant "Base de Datos (Adaptador)" as DBAdapter
+
+group Gestión de Modelos IA
+    Admin -> AdminFrontend: Navega a configuración de modelos IA
+    AdminFrontend -> AdminAPI: GET /api/admin/ia-models
+    AdminAPI -> IAConfigService: getAllModelConfigs()
+    IAConfigService -> DBAdapter: fetchAIModelConfigs()
+    DBAdapter --> IAConfigService: Lista de configuraciones
+    IAConfigService --> AdminAPI: Configuraciones
+    AdminAPI --> AdminFrontend: Lista de modelos y sus configs
+
+    Admin -> AdminFrontend: Modifica visibilidad / prompt de un modelo
+    AdminFrontend -> AdminAPI: PUT /api/admin/ia-models/{modelId} (body: { isVisible, systemPrompt })
+    AdminAPI -> IAConfigService: updateModelConfig(modelId, newConfig)
+    IAConfigService -> DBAdapter: saveAIModelConfig(modelId, newConfig)
+    DBAdapter --> IAConfigService: Confirmación
+    IAConfigService --> AdminAPI: Configuración actualizada
+    AdminAPI --> AdminFrontend: Confirmación
+    AdminFrontend -> Admin: Muestra éxito
+end group
+
+group Gestión de API Keys (Ej. OpenAI)
+    Admin -> AdminFrontend: Navega a configuración de API Keys
+    AdminFrontend -> AdminAPI: GET /api/admin/api-keys (para mostrar si ya hay alguna, usualmente no se muestra la key completa)
+    AdminAPI -> IAConfigService: getApiKeyStatus("OpenAI")
+    IAConfigService -> DBAdapter: fetchApiKey("OpenAI") 'Solo para verificar existencia o metadata, no la key en sí'
+    DBAdapter --> IAConfigService: Estado de la Key
+    IAConfigService --> AdminAPI: Estado
+    AdminAPI --> AdminFrontend: Estado
+
+    Admin -> AdminFrontend: Ingresa/Actualiza API Key de OpenAI
+    AdminFrontend -> AdminAPI: POST /api/admin/api-keys (body: { provider: "OpenAI", apiKey })
+    AdminAPI -> IAConfigService: setApiKey("OpenAI", apiKey)
+    IAConfigService -> DBAdapter: saveApiKey("OpenAI", encryptedApiKey) 'IMPORTANTE: Encriptar la API key antes de guardarla'
+    DBAdapter --> IAConfigService: Confirmación
+    IAConfigService --> AdminAPI: Confirmación
+    AdminAPI --> AdminFrontend: Confirmación
+    AdminFrontend -> Admin: Muestra éxito
+end group
+
+group Visualización de Costos (Ej. OpenAI)
+    Admin -> AdminFrontend: Solicita reporte de costos
+    AdminFrontend -> AdminAPI: GET /api/admin/costs?provider=OpenAI&period=monthly
+    AdminAPI -> IAConfigService: calculateCosts("OpenAI", period)
+    IAConfigService -> DBAdapter: getMessageTokenUsageByProvider("OpenAI", period)
+    DBAdapter --> IAConfigService: Uso de tokens (prompt_tokens, completion_tokens)
+    IAConfigService -> IAConfigService: Calcula costo basado en precios de OpenAI y uso de tokens
+    IAConfigService --> AdminAPI: Reporte de costos
+    AdminAPI --> AdminFrontend: Reporte
+    AdminFrontend -> Admin: Muestra reporte de costos
+end group
+@enduml
