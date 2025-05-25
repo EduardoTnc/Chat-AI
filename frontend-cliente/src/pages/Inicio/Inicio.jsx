@@ -1,9 +1,8 @@
 import React from 'react'
-import Header from '../../components/Header/Header'
-import ExplorarMenu from '../../components/ExplorarMenu/ExplorarMenu'
+import Header from '../../components/Page Inicio/Header'
+import ExplorarMenu from '../../components/Page Inicio/ExplorarMenu'
 import { useState } from 'react'
-import MostrarPlatos from '../../components/MostrarPlatos/MostrarPlatos'
-import AppDownload from '../../components/AppDownload/AppDownload'
+import MostrarPlatos from '../../components/Page Inicio/MostrarPlatos'
 
 const Inicio = () => {
 

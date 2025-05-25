@@ -1,6 +1,6 @@
 import React, { useContext } from 'react'
 import { TiendaContext } from '../../context/TiendaContext'
-import PlatoItem from '../PlatoItem/PlatoItem'
+import PlatoItem from './PlatoItem'
 
 const MostrarPlatos = ({categoria}) => {
 

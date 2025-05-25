@@ -25,9 +25,9 @@ const LoginPopup = ({ setMostrarLogin }) => {
     e.preventDefault();
     let newUrl = urlApi;
     if(currState === "Iniciar Sesión"){
-      newUrl += "/api/user/login"
+      newUrl += "/auth/login"
     }else{
-      newUrl += "/api/user/register"
+      newUrl += "/auth/register"
     }
 
     const response = await axios.post(newUrl, data)

@@ -1,14 +1,14 @@
 import React, { useState } from 'react'
-import Navbar from './components/Navbar/Navbar'
+import Navbar from './components/Layout/Navbar'
 import { Routes, Route } from 'react-router-dom'
 import Inicio from './pages/Inicio/Inicio'
 import Carrito from './pages/Carrito/Carrito'
 import TomarOrden from './pages/TomarOrden/TomarOrden'
-import Footer from './components/Footer/Footer'
-import LoginPopup from './components/LoginPopup/LoginPopup'
+import Footer from './components/Layout/Footer'
+import LoginPopup from './components/Layout/LoginPopup'
 import OrdenRecibida from './pages/OrdenRecibida/OrdenRecibida'
 import MisOrdenes from './pages/MisOrdenes/MisOrdenes'
-import ChatPage from './components/Chat/ChatPage'
+import ChatPage from './components/Chat/User-Chat/ChatPage'
 import FloatingChatButton from './components/Chat/FloatingChatButton'
 
 const App = () => {

@@ -7,7 +7,7 @@ export const ChatContext = createContext(null);
 
 const ChatContextProvider = (props) => {
   const { token, urlApi } = useContext(TiendaContext);
-  
+
   const [socket, setSocket] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [currentChat, setCurrentChat] = useState(null);
@@ -16,11 +16,12 @@ const ChatContextProvider = (props) => {
   const [typingUsers, setTypingUsers] = useState({});
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   // Estado para el asistente IA
   const [showingAIChat, setShowingAIChat] = useState(false);
   const [aiAssistant, setAiAssistant] = useState(null);
-  
+
+  // MARK: useEffect token
   // Conectar al socket cuando el usuario inicia sesión
   useEffect(() => {
     if (!token) {
@@ -31,14 +32,14 @@ const ChatContextProvider = (props) => {
       }
       return;
     }
-    
+
     // Crear conexión con Socket.IO
     const newSocket = io(urlApi, {
       auth: { token }
     });
-    
+
     setSocket(newSocket);
-    
+
     // Limpiar al desmontar
     return () => {
       if (newSocket) {
@@ -46,42 +47,43 @@ const ChatContextProvider = (props) => {
       }
     };
   }, [token, urlApi]);
-  
+
+  // MARK: useEffect socket
   // Configurar eventos del socket
   useEffect(() => {
     if (!socket) return;
-    
+
     // Manejar recepción de nuevos mensajes
     socket.on('newMessage', (message) => {
       // Agregar mensaje a la conversación actual si corresponde
       if (currentChat && (currentChat._id === message.sender)) {
         setMessages((prev) => [...prev, message]);
-        
+
         // Marcar como leído automáticamente
         socket.emit('markAsRead', { messageId: message._id });
       }
-      
+
       // Actualizar lista de conversaciones
       getConversationList();
     });
-    
+
     // Manejar confirmación de envío de mensaje
     socket.on('messageSent', (message) => {
       setMessages((prev) => [...prev, message]);
       setNewMessage('');
     });
-    
+
     // Manejar errores
     socket.on('messageError', (error) => {
       console.error('Error en mensaje:', error);
       // Aquí podrías mostrar una notificación al usuario
     });
-    
+
     // Obtener usuarios en línea
     socket.on('onlineUsers', (users) => {
       setOnlineUsers(users);
     });
-    
+
     // Manejar cambios de estado de usuarios
     socket.on('userStatus', ({ userId, status }) => {
       if (status === 'online') {
@@ -90,16 +92,16 @@ const ChatContextProvider = (props) => {
         setOnlineUsers((prev) => prev.filter(id => id !== userId));
       }
     });
-    
+
     // Manejar eventos de escritura
     socket.on('userTyping', ({ userId }) => {
       setTypingUsers((prev) => ({ ...prev, [userId]: true }));
     });
-    
+
     socket.on('userStopTyping', ({ userId }) => {
       setTypingUsers((prev) => ({ ...prev, [userId]: false }));
     });
-    
+
     return () => {
       socket.off('newMessage');
       socket.off('messageSent');
@@ -110,17 +112,18 @@ const ChatContextProvider = (props) => {
       socket.off('userStopTyping');
     };
   }, [socket, currentChat]);
-  
+
+  // MARK: getConversationList
   // Obtener lista de conversaciones
   const getConversationList = async () => {
     if (!token) return;
-    
+
     try {
       setLoading(true);
       const response = await axios.get(`${urlApi}/api/messages/conversations`, {
         headers: { token }
       });
-      
+
       if (response.data.success) {
         setConversations(response.data.data);
       }
@@ -130,17 +133,18 @@ const ChatContextProvider = (props) => {
       setLoading(false);
     }
   };
-  
+
+  // MARK: getMessages
   // Obtener mensajes de una conversación específica
   const getMessages = async (userId) => {
     if (!token || !userId) return;
-    
+
     try {
       setLoading(true);
       const response = await axios.get(`${urlApi}/api/messages/conversations/${userId}`, {
         headers: { token }
       });
-      
+
       if (response.data.success) {
         setMessages(response.data.data);
       }
@@ -150,46 +154,51 @@ const ChatContextProvider = (props) => {
       setLoading(false);
     }
   };
-  
+
+  // MARK: sendMessage
   // Enviar un mensaje
   const sendMessage = () => {
     if (!socket || !currentChat || !newMessage.trim()) return;
-    
+
     // Indicar que el usuario ha dejado de escribir
     socket.emit('stopTyping', { receiverId: currentChat._id });
-    
+
     // Enviar mensaje a través de Socket.IO
     socket.emit('sendMessage', {
       receiverId: currentChat._id,
       content: newMessage.trim()
     });
   };
-  
+
+  // MARK: handleTyping
   // Manejar evento de escritura
   const handleTyping = (isTyping) => {
     if (!socket || !currentChat) return;
-    
+
     if (isTyping) {
       socket.emit('typing', { receiverId: currentChat._id });
     } else {
       socket.emit('stopTyping', { receiverId: currentChat._id });
     }
   };
-  
+
+  // MARK: startConversation
   // Establecer la conversación actual
   const startConversation = async (user) => {
     setShowingAIChat(false);
     setCurrentChat(user);
     await getMessages(user._id);
   };
-  
+
+  // MARK: startAIChat
   // Iniciar chat con el asistente IA
   const startAIChat = () => {
     setShowingAIChat(true);
     setCurrentChat(null);
     setMessages([]);
   };
-  
+
+  // MARK: useEffect login
   // Cargar datos iniciales cuando el usuario inicia sesión
   useEffect(() => {
     if (token) {
@@ -200,7 +209,7 @@ const ChatContextProvider = (props) => {
       setCurrentChat(null);
     }
   }, [token]);
-  
+
   const contextValue = {
     conversations,
     currentChat,
@@ -221,7 +230,7 @@ const ChatContextProvider = (props) => {
     startAIChat,
     aiAssistant
   };
-  
+
   return (
     <ChatContext.Provider value={contextValue}>
       {props.children}

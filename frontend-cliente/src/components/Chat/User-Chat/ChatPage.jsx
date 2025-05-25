@@ -1,10 +1,10 @@
 import React, { useContext } from 'react';
 import { Navigate } from 'react-router-dom';
-import { TiendaContext } from '../../context/TiendaContext';
-import { ChatContext } from '../../context/ChatContext';
-import ConversationList from './ConversationList';
+import { TiendaContext } from '../../../context/TiendaContext';
+import { ChatContext } from '../../../context/ChatContext';
+import ConversationList from '../ConversationList';
 import ChatArea from './ChatArea';
-import AIAssistantChat from './AIAssistantChat';
+import AIAssistantChat from '../AI-Chat/AIAssistantChat';
 import './ChatPage.css';
 
 const ChatPage = () => {

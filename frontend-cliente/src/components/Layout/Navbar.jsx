@@ -3,7 +3,6 @@ import { assets } from '../../assets/assets'
 import { Link, useNavigate } from 'react-router-dom'
 import { useContext } from 'react'
 import { TiendaContext } from '../../context/TiendaContext'
-import { ChatContext } from '../../context/ChatContext'
 
 const Navbar = ({ setMostrarLogin }) => {
 

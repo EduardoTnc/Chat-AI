@@ -1,6 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { TiendaContext } from '../../context/TiendaContext';
-import { ChatContext } from '../../context/ChatContext';
+import { TiendaContext } from '../../../context/TiendaContext';
+import { ChatContext } from '../../../context/ChatContext';
 import axios from 'axios';
 import './UserSearch.css';
 

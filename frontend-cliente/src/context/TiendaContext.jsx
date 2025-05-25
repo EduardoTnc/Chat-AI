@@ -4,7 +4,7 @@ export const TiendaContext = createContext(null)
 
 const TiendaContextProvider = (props) => {
 
-  const urlApi = "http://localhost:4000"
+  const urlApi = "http://localhost:5001/api/v1"
   const [carritoItems, setCarritoItems] = useState({});
   const [token, setToken] = useState(localStorage.getItem("token") || "")
   const [listaPlatos, setListaPlatos] = useState([])

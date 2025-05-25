@@ -1,53 +1,53 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { ChatContext } from '../../context/ChatContext';
-import MessageItem from './MessageItem';
+import { ChatContext } from '../../../context/ChatContext';
+import MessageItem from '../MessageItem';
 import './ChatArea.css';
 
 const ChatArea = () => {
-  const { 
-    currentChat, 
-    messages, 
-    newMessage, 
-    setNewMessage, 
-    sendMessage, 
+  const {
+    currentChat,
+    messages,
+    newMessage,
+    setNewMessage,
+    sendMessage,
     handleTyping,
     isTyping
   } = useContext(ChatContext);
-  
+
   const messagesEndRef = useRef(null);
   const [typingTimeout, setTypingTimeout] = useState(null);
-  
+
   // Desplazamiento automático al último mensaje
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-  
+
   // Manejar cambios en el input del mensaje
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
-    
+
     // Manejar eventos de escritura
     if (currentChat) {
       handleTyping(true);
-      
+
       // Limpiar el timeout anterior si existe
       if (typingTimeout) {
         clearTimeout(typingTimeout);
       }
-      
+
       // Establecer un nuevo timeout
       const newTimeout = setTimeout(() => {
         handleTyping(false);
       }, 1000);
-      
+
       setTypingTimeout(newTimeout);
     }
   };
-  
+
   // Manejar el envío del mensaje
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -55,7 +55,7 @@ const ChatArea = () => {
       sendMessage();
     }
   };
-  
+
   if (!currentChat) {
     return (
       <div className="empty-chat-area">
@@ -66,7 +66,7 @@ const ChatArea = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="chat-area">
       <div className="chat-header">
@@ -84,7 +84,7 @@ const ChatArea = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="messages-container">
         {messages.length === 0 ? (
           <div className="no-messages">
@@ -110,7 +110,7 @@ const ChatArea = () => {
         )}
         <div ref={messagesEndRef} />
       </div>
-      
+
       <form className="message-input-container" onSubmit={handleSendMessage}>
         <input
           type="text"
@@ -118,8 +118,8 @@ const ChatArea = () => {
           value={newMessage}
           onChange={handleInputChange}
         />
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="send-button"
           disabled={!newMessage.trim()}
         >

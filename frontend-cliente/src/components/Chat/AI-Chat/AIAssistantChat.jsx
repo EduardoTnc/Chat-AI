@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
-import { TiendaContext } from '../../context/TiendaContext';
-import MessageItem from './MessageItem';
+import { TiendaContext } from '../../../context/TiendaContext';
+import MessageItem from '../MessageItem';
 import axios from 'axios';
 import './AIAssistantChat.css';
 
@@ -33,6 +33,7 @@ const AIAssistantChat = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
   
+  // MARK: loadConversation
   // Cargar conversación existente con el asistente
   const loadConversation = async () => {
     try {
@@ -52,6 +53,7 @@ const AIAssistantChat = () => {
     }
   };
   
+  // MARK: loadAvailableModels
   // Cargar modelos de IA disponibles
   const loadAvailableModels = async () => {
     try {
@@ -68,6 +70,7 @@ const AIAssistantChat = () => {
     }
   };
   
+  // MARK: handleSendMessage
   // Enviar mensaje al asistente IA
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -112,6 +115,7 @@ const AIAssistantChat = () => {
     }
   };
   
+  // MARK: render
   return (
     <div className="ai-chat-container">
       {/* Cabecera del chat */}
