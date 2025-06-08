@@ -8,10 +8,26 @@ import './FloatingChatButton.css';
 
 const FloatingChatButton = () => {
   const { isAuthenticated } = useAuth();
-  const { conversations, selectAIChat, isAIChatActive } = useContext(ChatContext);
+  const { 
+    conversations, 
+    selectAIChat, 
+    isAIChatActive, 
+    currentChat,
+    handleTypingEvent 
+  } = useContext(ChatContext);
 
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  
+  // Efecto para limpiar el estado de typing cuando se cierra el chat
+  useEffect(() => {
+    return () => {
+      // Cuando el componente se desmonte, asegurarse de detener el typing
+      if (currentChat && !isAIChatActive) {
+        handleTypingEvent(false);
+      }
+    };
+  }, [currentChat, isAIChatActive]);
 
   // Calcular el número de mensajes no leídos
   useEffect(() => {
@@ -31,7 +47,13 @@ const FloatingChatButton = () => {
       {/* Botón flotante circular principal */}
       <button
         className={`floating-chat-button ${isOpen ? 'open' : ''}`}
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          // Si se está cerrando el chat, detener el typing
+          if (isOpen && currentChat && !isAIChatActive) {
+            handleTypingEvent(false);
+          }
+          setIsOpen(!isOpen);
+        }}
         aria-label="Chat"
       >
         {isOpen ? (
@@ -82,7 +104,16 @@ const FloatingChatButton = () => {
 
       {/* Overlay para cerrar el chat al hacer clic fuera de él */}
       {isOpen && (
-        <div className="chat-overlay" onClick={() => setIsOpen(false)} />
+        <div 
+          className="chat-overlay" 
+          onClick={() => {
+            // Detener el typing antes de cerrar
+            if (currentChat && !isAIChatActive) {
+              handleTypingEvent(false);
+            }
+            setIsOpen(false);
+          }} 
+        />
       )}
     </>
   );

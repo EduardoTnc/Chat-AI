@@ -59,7 +59,9 @@ export const useChatActions = (
         // Cargar los mensajes de esta conversación (esto se hará en useEffect)
 
         // Marcar como leído si hay mensajes no leídos
-        if (conversation.unreadCount > 0) {
+
+        if ((conversation.unreadCounts?.find(uc => uc.userId === user._id)?.count || 0) > 0) {
+            console.log('Marcando conversación como leída desde selectConversation', conversation.unreadCounts?.find(uc => uc.userId === user._id)?.count || 0);
             markConversationAsRead(conversation._id);
         }
     }, [user?._id, currentChat]);

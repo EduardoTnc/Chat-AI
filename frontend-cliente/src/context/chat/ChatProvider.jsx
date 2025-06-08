@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAuth } from '../AuthContext';
 import axios from 'axios';
 import { ChatContext } from './ChatContext';
@@ -39,9 +39,7 @@ const ChatContextProvider = ({ children }) => {
         urlBase,
         token,
         user,
-        socket, // socket instance from ChatProvider's state
-        // currentChat, // Removed: will be passed directly to handleTypingEvent when called
-        // isAIChatActive, // Removed: will be passed directly to handleTypingEvent when called
+        socket,
         setSocket,
         setConversations,
         setCurrentChat,
@@ -151,12 +149,20 @@ const ChatContextProvider = ({ children }) => {
 
 
     // Manejar eventos de escritura cuando cambia el input de mensaje
+    const prevMessageInputRef = useRef('');
+    
     useEffect(() => {
         if (socket && currentChat && !isAIChatActive) {
-            // Usar la función handleTypingEvent directamente del hook
+            const wasTyping = prevMessageInputRef.current.length > 0;
             const isTyping = newMessageInput.length > 0;
-            // Pass currentChat and isAIChatActive directly as they are no longer part of the hook's internal state for this function
-            socketHandlers.handleTypingEvent(isTyping, currentChat, isAIChatActive);
+            
+            // Solo emitir evento si el estado de typing ha cambiado
+            if (wasTyping !== isTyping) {
+                socketHandlers.handleTypingEvent(isTyping, currentChat, isAIChatActive);
+            }
+            
+            // Actualizar la referencia con el valor actual
+            prevMessageInputRef.current = newMessageInput;
         }
     }, [socket, currentChat, newMessageInput, isAIChatActive, socketHandlers]);
 
@@ -233,7 +239,7 @@ const ChatContextProvider = ({ children }) => {
         isTyping: isUserTyping,
         getOtherParticipant,
         getTotalUnreadCount: () => getTotalUnreadCount(conversations),
-        // The handleTypingEvent from socketHandlers now expects (isTypingValue, currentChatValue, isAIChatActiveValue)
+
         handleTypingEvent: (isTyping) => socketHandlers.handleTypingEvent(isTyping, currentChat, isAIChatActive)
     };
 

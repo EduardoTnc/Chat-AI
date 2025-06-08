@@ -10,12 +10,13 @@ const ChatArea = () => {
     messages,
     newMessageInput,
     setNewMessageInput,
-    sendMessageToUser, // Nueva función específica
-    handleTypingEvent, // Nueva función específica
-    isTyping, // { conversationId: { userId, isTyping }}
+    sendMessageToUser,
+    handleTypingEvent,
+    isTyping,
     loadingMessages,
   } = useContext(ChatContext);
-  const { user } = useAuth(); // Obtenemos el usuario actual desde AuthContext
+
+  const { user } = useAuth();
 
   const messagesEndRef = useRef(null);
 
@@ -28,6 +29,16 @@ const ChatArea = () => {
 
   }, [newMessageInput, isTyping]);
 
+
+  // Efecto para limpiar el estado de typing al desmontar o cambiar de conversación
+  useEffect(() => {
+    return () => {
+      // Cuando el componente se desmonte o cambie la conversación, detener el typing
+      if (currentChat?.activeConversationId && currentChat?._id) {
+        handleTypingEvent(false);
+      }
+    };
+  }, [currentChat?.activeConversationId, currentChat?._id]);
 
   const handleInputChange = (e) => {
     setNewMessageInput(e.target.value);

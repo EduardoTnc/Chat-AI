@@ -5,9 +5,7 @@ export const useChatSocket = (
     urlBase,
     token,
     user,
-    socket, // socket instance from ChatProvider's state
-    // currentChat, // Removed: will be passed directly to handleTypingEvent when called
-    // isAIChatActive, // Removed: will be passed directly to handleTypingEvent when called
+    socket,
     setSocket,
     setConversations,
     setCurrentChat,
@@ -157,7 +155,6 @@ export const useChatSocket = (
         };
     }, [setMessages, setOnlineUsers, setTypingUsers, setConversations]);
 
-    // Función para enviar eventos de typing
     // Función para enviar eventos de typing
     const handleTypingEvent = useCallback((isTypingValue, currentChatValue, isAIChatActiveValue) => {
         // 'socket' here refers to the 'socket' prop passed to useChatSocket.
