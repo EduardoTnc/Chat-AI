@@ -1,12 +1,15 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { TiendaContext } from '../../../context/TiendaContext';
-import { ChatContext } from '../../../context/ChatContext';
+import { ChatContext } from '../../../context/chat/ChatContext';
 import axios from 'axios';
+import { useAuth } from '../../../context/AuthContext';
 import './UserSearch.css';
 
 const UserSearch = ({ onClose }) => {
-  const { token, urlApi } = useContext(TiendaContext);
+  const { token, urlApi } = useAuth();
   const { startConversation, conversations } = useContext(ChatContext);
+
+  // Asegurarse de que conversations es siempre un array
+  const safeConversations = conversations || [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
@@ -26,13 +29,17 @@ const UserSearch = ({ onClose }) => {
         setLoading(true);
         setError('');
 
-        const response = await axios.get(`${urlApi}/api/user/search?query=${searchTerm}`, {
+        const response = await axios.get(`${urlApi}/chat-api/search?query=${searchTerm}`, {
           headers: { token }
         });
 
+
         if (response.data.success) {
-          setUsers(response.data.users);
+          console.log("response.data", response.data);
+          setUsers(response.data.data);
+          console.log("response.data.users", response.data.data);
         } else {
+          console.error("response.data", response.data);
           setError('Error al buscar usuarios');
         }
       } catch (error) {
@@ -66,9 +73,11 @@ const UserSearch = ({ onClose }) => {
   };
 
   // Filtrar usuarios que ya están en las conversaciones existentes
-  const filteredUsers = users.filter(user => {
+  const filteredUsers = (users || []).filter(user => {
     // Verificar si ya existe una conversación con este usuario
-    return !conversations.some(conv => conv._id === user._id);
+    return !safeConversations.some(conv =>
+      conv.participants.some(participant => participant._id === user._id)
+    );
   });
 
   return (
@@ -108,11 +117,11 @@ const UserSearch = ({ onClose }) => {
           <div className="search-status error">{error}</div>
         ) : searchTerm.length < 2 ? (
           <div className="search-status">Ingresa al menos 2 caracteres para buscar</div>
-        ) : filteredUsers.length === 0 ? (
+        ) : (users || []).length === 0 ? (
           <div className="search-status">No se encontraron usuarios</div>
         ) : (
           <ul className="user-list">
-            {filteredUsers.map(user => (
+            {(users || []).map(user => (
               <li
                 key={user._id}
                 className="user-item"

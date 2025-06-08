@@ -1,6 +1,6 @@
 .chat-page {
   width: 100%;
-  min-height: calc(100vh - 80px); /* Ajustar según la altura de tu navbar */
+  min-height: calc(100vh - 100px); /* Ajustar según la altura de tu navbar */
   display: flex;
   justify-content: center;
   align-items: center;

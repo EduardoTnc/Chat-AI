@@ -8,7 +8,7 @@ import Footer from './components/Layout/Footer'
 import LoginPopup from './components/Layout/LoginPopup'
 import OrdenRecibida from './pages/OrdenRecibida/OrdenRecibida'
 import MisOrdenes from './pages/MisOrdenes/MisOrdenes'
-import ChatPage from './components/Chat/User-Chat/ChatPage'
+import ChatPage from './components/Chat/ChatPage'
 import FloatingChatButton from './components/Chat/FloatingChatButton'
 
 const App = () => {
@@ -17,7 +17,6 @@ const App = () => {
 
   return (
     <div className='min-h-[100dvh]'>
-
 
       {mostrarLogin && <LoginPopup setMostrarLogin={setMostrarLogin} />}
 
@@ -33,7 +32,9 @@ const App = () => {
         </Routes>
       </div>
       <Footer />
+
       <FloatingChatButton />
+
     </div>
   )
 }

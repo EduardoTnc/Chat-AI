@@ -1,5 +1,6 @@
 // server/chat-module/socketHandlers/UserSocketHandler.js
 import { ApiError } from '../../utils/errorHandler.js';
+import mongoose from 'mongoose';
 
 class UserSocketHandler {
     constructor(socket, io, messageService, connectedUsers) {
@@ -67,20 +68,19 @@ class UserSocketHandler {
      * @throws {ApiError} Si ocurre un error al procesar la solicitud de mensaje
      */
     async handleSendMessageToUser(payload, ack) { // payload: { receiverId, content, tempId?, clientInfo? }
-        const { receiverId, content, tempId, clientInfo, conversationId: existingConvId } = payload;
+        const { tempId, conversationId, receiverId, content } = payload;
         if (!receiverId || !content) {
             throw new ApiError(400, 'ReceiverId y content son requeridos.');
         }
 
         const messageData = {
-            conversationId: existingConvId, // Puede ser null si es un chat nuevo
+            conversationId: conversationId, // Puede ser null si es un chat nuevo
             senderId: this.user._id,
             receiverId: new mongoose.Types.ObjectId(receiverId),
-            content,
-            type: 'userMessage',
             senderType: 'user',
             receiverType: 'user',
-            clientInfo // Se añade al crear la conversación si es nueva
+            content: content,
+            type: 'userMessage',
         };
 
         //? 1. Crear el mensaje (con messageService.createMessage, que también crea la conversación si es necesario)
@@ -90,7 +90,7 @@ class UserSocketHandler {
         this.socket.emit('messageSent', { message: newMessage, tempId });
 
         //* 3. Enviar mensaje al receptor si está online (a todas sus conexiones)
-        const sentToReceiver = this.io.emitToUser(receiverId.toString(), 'newMessage', { message: newMessage });
+        const sentToReceiver = this.io.emitToUser(receiverId.toString(), 'newMessage', newMessage);
         console.log(`Mensaje enviado al usuario ${receiverId}:`, sentToReceiver);
 
         if (!sentToReceiver) {

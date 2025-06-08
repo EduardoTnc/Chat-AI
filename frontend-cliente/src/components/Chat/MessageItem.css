@@ -34,3 +34,40 @@
   display: block;
   margin-top: 2px;
 }
+
+.ia-message .message-content {
+  background-color: #e1f5fe;
+  /* Azul claro para IA */
+}
+
+.agent-message .message-content {
+  background-color: #fff9c4;
+  /* Amarillo claro para Agente */
+}
+
+.system-message .message-content {
+  background-color: #f0f0f0;
+  font-style: italic;
+  font-size: 0.9em;
+  text-align: center;
+  width: 100%;
+  /* Para que ocupe todo el ancho si es de sistema */
+  max-width: 100%;
+  margin-left: 0 !important;
+  /* Centrar si es necesario */
+  align-self: center;
+}
+
+.system-message {
+  /* El contenedor del mensaje de sistema */
+  justify-content: center;
+  max-width: 100%;
+  margin-left: 0 !important;
+}
+
+.message-sender-name {
+  font-weight: bold;
+  font-size: 0.8em;
+  margin-bottom: 4px;
+  color: #555;
+}

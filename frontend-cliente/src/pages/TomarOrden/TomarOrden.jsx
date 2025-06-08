@@ -3,10 +3,12 @@ import { useContext } from 'react'
 import { TiendaContext } from '../../context/TiendaContext'
 import axios from 'axios'
 import { useNavigate } from 'react-router-dom'
+import {useAuth} from '../../context/AuthContext'
 
 const TomarOrden = () => {
 
-  const { calcularMontoTotal, token, listaPlatos, carritoItems, urlApi } = useContext(TiendaContext)
+  const { calcularMontoTotal, listaPlatos, carritoItems } = useContext(TiendaContext)
+  const {urlApi, token} = useAuth()
 
   const navigate = useNavigate();
 

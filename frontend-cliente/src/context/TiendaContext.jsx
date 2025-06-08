@@ -1,84 +1,106 @@
 import { createContext, useState, useEffect } from "react";
 import axios from "axios";
-export const TiendaContext = createContext(null)
+import { useAuth } from "./AuthContext";
+
+export const TiendaContext = createContext(null);
 
 const TiendaContextProvider = (props) => {
-
-  const urlApi = "http://localhost:5001/api/v1"
+  const { token, urlApi } = useAuth();
   const [carritoItems, setCarritoItems] = useState({});
-  const [token, setToken] = useState(localStorage.getItem("token") || "")
-  const [listaPlatos, setListaPlatos] = useState([])
+  const [listaPlatos, setListaPlatos] = useState([]);
 
-  const agregarAlCarrito = (itemId) => {
-    if (!carritoItems[itemId]) {
-      setCarritoItems(prev => ({ ...prev, [itemId]: 1 }))
-    } else {
-      setCarritoItems(prev => ({ ...prev, [itemId]: prev[itemId] + 1 }))
-    }
+  useEffect(() => {
+    // fecthListaPlatos();
     if (token) {
-      axios.post(`${urlApi}/api/cart/add`, { itemId: itemId }, { headers: { token: token } })
+      // cargarCarrito(token);
     }
-  }
+  }, [token]);
 
-  const quitarDelCarrito = (itemId) => {
-    if (carritoItems[itemId] === 1) {
-      setCarritoItems(prev => ({ ...prev, [itemId]: null }))
-    } else {
-      setCarritoItems(prev => ({ ...prev, [itemId]: prev[itemId] - 1 }))
-    }
+  const agregarAlCarrito = async (itemId) => { // Hacerla async si la llamada API es importante para el estado
+    setCarritoItems(prev => ({ ...prev, [itemId]: (prev[itemId] || 0) + 1 }));
     if (token) {
-      axios.post(`${urlApi}/api/cart/remove`, { itemId: itemId }, { headers: { token: token } })
+      try {
+        await axios.post(`${urlApi}/cart/add`, { itemId }, { headers: { Authorization: `Bearer ${token}` } });
+      } catch (error) {
+        console.error("Error agregando al carrito en backend:", error);
+        // Aquí podrías revertir el cambio optimista si la llamada falla
+      }
     }
-  }
+  };
 
-  const vaciarCarrito = () => {
-    setCarritoItems({})
+  const quitarDelCarrito = async (itemId) => {
+    setCarritoItems(prev => {
+      const newCount = (prev[itemId] || 0) - 1;
+      if (newCount <= 0) {
+        const { [itemId]: _, ...rest } = prev; // Quitar el item
+        return rest;
+      }
+      return { ...prev, [itemId]: newCount };
+    });
     if (token) {
-      axios.post(`${urlApi}/api/cart/clear`,{}, { headers: { token: token } })
+      try {
+        await axios.post(`${urlApi}/cart/remove`, { itemId }, { headers: { Authorization: `Bearer ${token}` } });
+      } catch (error) {
+        console.error("Error quitando del carrito en backend:", error);
+      }
     }
-  }
+  };
 
-  const cargarCarrito = async (token) => {
-    const response = await axios.post(`${urlApi}/api/cart/get`,{}, { headers: {token: token} })
-    setCarritoItems(response.data.cartData)
-  }
+  const vaciarCarrito = async () => {
+    setCarritoItems({});
+    if (token) {
+      try {
+        await axios.post(`${urlApi}/cart/clear`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      } catch (error) {
+        console.error("Error vaciando carrito en backend:", error);
+      }
+    }
+  };
+
+  const cargarCarrito = async (currentToken) => {
+    if (!currentToken) return;
+    try {
+      const response = await axios.get(`${urlApi}/cart/get`, { headers: { Authorization: `Bearer ${currentToken}` } }); // Asumiendo GET para obtener
+      if (response.data.success) {
+        setCarritoItems(response.data.cartData || {});
+      }
+    } catch (error) {
+      console.error("Error cargando carrito:", error);
+    }
+  };
 
   const calcularMontoTotal = () => {
     let montoTotal = 0;
     for (const itemId in carritoItems) {
-      const item = listaPlatos.find((item) => item._id === itemId);
-      montoTotal += item.price * carritoItems[itemId];
+      if (carritoItems[itemId] > 0) {
+        const item = listaPlatos.find((item) => item._id === itemId);
+        if (item) {
+          montoTotal += item.price * carritoItems[itemId];
+        }
+      }
     }
-    return montoTotal
-  }
+    return montoTotal;
+  };
 
   const calcularCantidadTotal = () => {
     let cantidadTotal = 0;
     for (const itemId in carritoItems) {
-      cantidadTotal += carritoItems[itemId];
+      cantidadTotal += carritoItems[itemId] || 0;
     }
-    return cantidadTotal
-  }
+    return cantidadTotal;
+  };
 
   const fecthListaPlatos = async () => {
-    try {
-      const response = await axios.get(`${urlApi}/api/menu-items/list`)
-      const data = await response.data.menuItems
-      setListaPlatos(data)
-    } catch (error) {
-      console.log(error)
-    }
-  }
-
-  useEffect(() => {
-    async function cargarData() {
-      await fecthListaPlatos()
-      if (token) {
-        await cargarCarrito(token)
+    try {      // Asumiendo que la ruta es parte de tu API y no necesita token para ver menú
+      const response = await axios.get(`${urlApi}/menu-items/list`);
+      if (response.data.success) {
+        setListaPlatos(response.data.menuItems);
       }
+    } catch (error) {
+      console.log("Error fetching listaPlatos", error);
     }
-    cargarData()
-  }, [token])
+  };
+
 
   const contextValue = {
     listaPlatos,
@@ -88,17 +110,14 @@ const TiendaContextProvider = (props) => {
     quitarDelCarrito,
     calcularMontoTotal,
     calcularCantidadTotal,
-    urlApi,
-    token,
-    setToken,
-    vaciarCarrito
-  }
+    vaciarCarrito,
+  };
 
   return (
     <TiendaContext.Provider value={contextValue}>
       {props.children}
     </TiendaContext.Provider>
-  )
-}
+  );
+};
 
-export default TiendaContextProvider
+export default TiendaContextProvider;

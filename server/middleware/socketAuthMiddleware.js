@@ -3,7 +3,7 @@ import User from '../models/User.js';
 
 const authenticateSocket = async (socket, next) => {
     const token = socket.handshake.auth?.token || socket.handshake.headers['x-auth-token'];
-
+    console.log("Token recibido:", token);
     if (!token) {
         console.warn('Socket: Conexión sin token.');
         return next(new Error('Authentication error: No token provided'));

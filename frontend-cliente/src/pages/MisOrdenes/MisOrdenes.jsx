@@ -1,13 +1,12 @@
 import React, { useState } from 'react'
-import { useContext } from 'react'
-import { TiendaContext } from '../../context/TiendaContext'
 import axios from 'axios'
 import { useEffect } from 'react'
 import { assets } from '../../assets/assets'
+import { useAuth } from '../../context/AuthContext'
 
 const MisOrdenes = () => {
 
-  const { urlApi, token } = useContext(TiendaContext)
+  const { urlApi, token } = useAuth()
   const [ordersData, setOrdersData] = useState([])
 
   const fetchOrders = async () => {

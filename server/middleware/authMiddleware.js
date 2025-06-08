@@ -3,7 +3,16 @@ import User from '../models/User.js';
 import config from '../config/index.js';
 import { ApiError } from '../utils/errorHandler.js';
 
-// Middleware para proteger rutas
+/**
+ * Middleware para proteger rutas:
+ * 1. Verificar si hay un token de autorización en los headers.
+ * 2. Extraer el token del header "Bearer <token>".
+ * 3. Verificar la validez del token.
+ * 4. Buscar el usuario en la base de datos (sin incluir passwordHash).
+ * 5. Si no hay usuario con ese token, retornar error.
+ * 6. Adjuntar el usuario al objeto request para uso posterior.
+ * 7. Si no hay token, retornar error.
+ */
 const protect = async (req, res, next) => {
     let token;
 

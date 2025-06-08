@@ -1,20 +1,20 @@
 import mongoose from 'mongoose';
 
 const messageSchema = new mongoose.Schema({
-    conversationId: {
+    conversationId: { // El ID de la conversación
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Conversation',
         required: true,
         index: true,
     },
-    senderId: {
+    senderId: { // El ID del remitente
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
+        required: function () { return ['user', 'agent'].includes(this.senderType); } // Requerido solo si es user o agent
     },
-    senderType: {
+    senderType: { // El tipo de remitente
         type: String,
-        enum: ['user', 'IA', 'agent'],
+        enum: ['user', 'IA', 'agent', 'tool', 'systemNotification'],
         required: true,
     },
     receiverId: { // Puede ser null si el receptor es la IA
@@ -25,12 +25,15 @@ const messageSchema = new mongoose.Schema({
         type: String,
         enum: ['user', 'IA', 'agent'],
     },
-    content: {
+    content: { // El contenido del mensaje
         type: String,
-        required: true,
+        required: function () {
+            return !(this.senderType === 'IA' && this.toolCalls && this.toolCalls.length > 0);
+        },
         trim: true,
+        default: ''
     },
-    type: {
+    type: { // El tipo de mensaje
         type: String,
         enum: ['userQuery', 'IAResponse', 'userMessage', 'agentMessage', 'IAEscalationSignal', 'toolResult', 'systemNotification'],
         required: true,
@@ -38,16 +41,16 @@ const messageSchema = new mongoose.Schema({
     modelId: { // Para mensajes de/para IA, identifica el modelo usado
         type: String,
     },
-    read: {
+    read: { // Si el mensaje ha sido leído
         type: Boolean,
         default: false,
     },
-    readBy: [{ // Quién ha leído este mensaje (si es relevante para el tipo de mensaje)
+    readBy: [{ // Quién ha leído este mensaje
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
     }],
     timestamp: { // Mongoose añade `createdAt` y `updatedAt` por defecto con `timestamps: true`
-        type: Date,    // Pero a veces es útil tener un `timestamp` específico para el mensaje si hay retrasos.
+        type: Date,    // es útil tener un `timestamp` específico para el mensaje si hay retrasos
         default: Date.now,
         index: true,
     },
@@ -71,7 +74,7 @@ const messageSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
-    // Podrías añadir 'metadata' para información extra, como archivos adjuntos, etc.
+    // Podría añadir 'metadata' para información extra, como archivos adjuntos, etc.
     // metadata: {
     //    attachments: [{ fileName: String, url: String, mimeType: String }]
     // }

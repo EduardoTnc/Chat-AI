@@ -15,6 +15,7 @@ export const getAvailableAIModelsForClient = async (req, res, next) => {
 
         const models = await aiService.fetchAvailableModels(userId, userRole);
         res.status(200).json({
+            success: true,
             message: "Modelos de IA disponibles obtenidos",
             data: models,
         });
@@ -49,6 +50,7 @@ export const getAIConversationMessages = async (req, res, next) => {
 
 
         res.status(200).json({
+            success: true,
             message: "Historial de chat con IA obtenido",
             data: messages,
         });
@@ -66,6 +68,7 @@ export const markAIChatAsRead = async (req, res, next) => {
         const updatedConversation = await messageService.markConversationAsRead(conversationId, userId);
 
         res.status(200).json({
+            success: true,
             message: "Conversación de IA marcada como leída",
             data: updatedConversation
         });

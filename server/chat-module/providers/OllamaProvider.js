@@ -39,21 +39,22 @@ class OllamaProvider {
         if (systemPrompt) {
             ollamaMessages.push({ role: 'system', content: systemPrompt });
         }
+        console.log("Messages array before pushing to ollamaMessages:", JSON.stringify(messages, null, 2));
         ollamaMessages.push(...messages); // messages ya debe ser [{role, content}, ...]
 
         const payload = {
             model: modelApiIdentifier,
             messages: ollamaMessages,
             stream: false, // Por ahora, no streaming para simplificar la respuesta
-            format: modelOptions.format || 'json', // Si quieres que devuelva JSON para tool_calls
+            format: 'json', // Si quieres que devuelva JSON para tool_calls
             options: { // Parámetros del modelo
-                temperature: modelOptions.temperature,
+                // temperature: modelOptions.temperature,
                 // num_predict: modelOptions.max_tokens, // num_predict es el equivalente a max_tokens
                 // ... otros parámetros de Ollama
             },
-            ...(modelOptions.tools && { tools: modelOptions.tools }) // Añadir tools si existen
+            ...(modelOptions.tools && modelOptions.tools.length > 0 && { tools: modelOptions.tools }) // Añadir tools
         };
-
+        
         try {
             const response = await fetch(endpoint, {
                 method: 'POST',
@@ -89,7 +90,7 @@ class OllamaProvider {
                     type: 'function',
                     function: {
                         name: tc.function.name,
-                        arguments: JSON.stringify(tc.function.arguments) // Ollama devuelve arguments como objeto
+                        arguments: tc.function.arguments // Ollama devuelve arguments como objeto, no stringify
                     }
                 })),
                 usage,

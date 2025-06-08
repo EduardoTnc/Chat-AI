@@ -1,10 +1,12 @@
 import React, { useContext } from 'react'
 import { assets } from '../../assets/assets'
 import { TiendaContext } from '../../context/TiendaContext'
+import { useAuth } from '../../context/AuthContext'
 
 const PlatoItem = ({ id, nombre, precio, descripcion, imagen }) => {
 
-  const {carritoItems, agregarAlCarrito, quitarDelCarrito, urlApi} = useContext(TiendaContext);
+  const {carritoItems, agregarAlCarrito, quitarDelCarrito} = useContext(TiendaContext);
+  const {urlApi} = useAuth();
 
   return (
     <div className='w-full m-auto rounded-2xl shadow-md animate-fade-in-down animate-duration-500' data-id={id}>

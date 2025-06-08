@@ -19,6 +19,7 @@ const ADMIN_ROOM = "admins_room";
 
 const initializeSocketIO = (io) => {
     // Middleware de autenticación para cada conexión de Socket.IO
+    console.log("Initializing Socket.IO...");
     io.use(authenticateSocket);
 
     io.on('connection', (socket) => {

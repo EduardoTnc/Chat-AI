@@ -19,7 +19,12 @@ const startServer = async () => {
 
     // Configurar Socket.IO (crear instancia con el servidor HTTP)
     const io = new SocketIOServer(httpServer, {
-        cors: config.corsOptions // Usar corsOptions de config
+        cors: config.corsOptions, // Usar corsOptions de config
+        connectTimeout: 10000,  // 10 segundos
+        pingTimeout: 5000,
+        pingInterval: 10000,
+        transports: ['websocket', 'polling'],
+        allowUpgrades: true
     });
 
     // Inicializar manejadores de Socket.IO
@@ -44,6 +49,7 @@ const startServer = async () => {
 // Iniciar el servidor solo si no es importado o si estamos en modo desarrollo (ej. por un test)
 // Si este archivo es el punto de entrada principal (node server.js), startServer() se llamará.
 if (import.meta.url === `file://${process.argv[1]}` || config.env !== 'test') {
+    console.log("Iniciando servidor...");
     startServer().catch(err => { // Añadir un catch aquí por si connectDB falla y no estamos en test
         console.error(chalk.red.bold('Error fatal al iniciar la aplicación (fuera de test):'));
         console.error(err);

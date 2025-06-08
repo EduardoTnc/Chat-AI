@@ -1,4 +1,3 @@
-import React from 'react'
 import Header from '../../components/Page Inicio/Header'
 import ExplorarMenu from '../../components/Page Inicio/ExplorarMenu'
 import { useState } from 'react'

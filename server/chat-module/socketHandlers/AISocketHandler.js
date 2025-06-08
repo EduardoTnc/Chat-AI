@@ -123,14 +123,14 @@ class AISocketHandler {
             const errorMessageData = {
                 conversationId,
                 senderType: 'IA',
-                content: `Lo siento, no pude procesar tu solicitud en este momento. ${iaError.message}`,
+                content: `Lo siento, no pude procesar tu solicitud en este momento. Por favor, intenta de nuevo más tarde.`,
                 type: 'IAResponse',
                 modelId: clientModelId,
                 isError: true,
             };
             const savedErrorMessage = await this.messageService.createMessage(errorMessageData, { _id: null, role: 'system' });
             //* Notificar al cliente que hubo un error
-            this.socket.emit('newMessageFromIA', { message: savedErrorMessage, conversationId, isError: true });
+            this.socket.emit('newMessageFromIA', { message: errorMessageData, conversationId, isError: true });
             throw iaError; //! Para que el wrapper lo capture y envíe socketError
         }
     }

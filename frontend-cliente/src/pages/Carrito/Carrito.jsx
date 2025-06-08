@@ -1,10 +1,12 @@
 import React, { useContext } from 'react'
 import { TiendaContext } from '../../context/TiendaContext';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 const Carrito = () => {
 
-  const { carritoItems, listaPlatos, quitarDelCarrito, calcularMontoTotal, urlApi } = useContext(TiendaContext);
+  const { carritoItems, listaPlatos, quitarDelCarrito, calcularMontoTotal } = useContext(TiendaContext);
+  const {urlApi} = useAuth();
 
   const mobileScreen = window.innerWidth < 640;
 

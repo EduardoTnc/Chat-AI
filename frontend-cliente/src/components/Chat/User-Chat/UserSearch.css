@@ -1,9 +1,10 @@
 .user-search {
   display: flex;
   flex-direction: column;
-  width: 100%;
+  width: 386px;
   height: 100%;
   background-color: white;
+  border-right: 1px solid #e0e0e0;
 }
 
 .user-search-header {

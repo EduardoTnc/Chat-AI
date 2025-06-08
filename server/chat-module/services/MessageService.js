@@ -146,6 +146,28 @@ class MessageService {
 
 
     // MARK: - getAllConversationsForAdmin
+    /**
+     * Obtiene todas las conversaciones en el sistema. Solo los administradores pueden usar esta función.
+     * 
+     * @param {Object} [query] - Opciones de consulta (opcional)
+     * @param {number} [query.limit=15] - Número de elementos por página
+     * @param {number} [query.page=1] - Número de página a obtener
+     * @param {string} [query.type] - Tipo de conversación (user-to-agent, user-to-ia, user-to-user)
+     * @param {string} [query.status] - Estado de la conversación (pending, in_progress, solved, closed)
+     * @param {string} [query.participantId] - ID de un participante en la conversación
+     * @param {string} [query.agentId] - ID del agente asignado a la conversación
+     * @param {string} [query.sortBy=updatedAt] - Campo por el que ordenar las conversaciones (updatedAt, createdAt, lastMessage.timestamp)
+     * @param {string} [query.sortOrder=desc] - Orden de la lista (asc o desc)
+     * @param {string} [query.searchQuery] - Cadena de búsqueda en el título, email o nombre de los participantes
+     * @param {Object} requestingUser - Usuario que hace la solicitud (debe tener rol de 'admin')
+     * @returns {Promise<Object>} - Resultado de la consulta con las siguientes propiedades:
+     *  - conversations: lista de conversaciones
+     *  - total: cantidad total de conversaciones
+     *  - currentPage: número de página actual
+     *  - limit: número de elementos por página
+     *  - totalPages: número total de páginas
+     * @throws {ApiError} - Si el usuario no tiene permiso para ver todas las conversaciones
+     */
     async getAllConversationsForAdmin({ limit = 15, page = 1, type, status, participantId, agentId, sortBy = 'updatedAt', sortOrder = 'desc', searchQuery = '' }, requestingUser) {
         if (requestingUser.role !== 'admin') { // Solo admin usa esta función de "ver todo"
             throw new ApiError(403, "No autorizado para esta acción.");
@@ -235,7 +257,6 @@ class MessageService {
         if (messageData.senderType === 'agent' && !['agent', 'admin'].includes(requestingUser.role)) {
             throw new ApiError(403, 'Solo los agentes o administradores pueden enviar mensajes como agentes.');
         }
-        // senderType IA, tool, systemNotification son manejados internamente o por admins.
 
         let conversation; // Este será el objeto Mongoose completo para modificar y guardar
         let isNewConversation = false;
@@ -243,7 +264,7 @@ class MessageService {
         //? 1. Si existe la conversación, buscarla
         if (messageData.conversationId) {
             //! Validar acceso y si la conversación está cerrada ANTES de cargarla completa
-            await this._validateConversationAccess(messageData.conversationId, requestingUser._id, requestingUser.role, true); // true para checkStatusNotClosed
+            await this._validateConversationAccess(messageData.conversationId, requestingUser._id, requestingUser.role, true);
 
             conversation = await Conversation.findById(messageData.conversationId); // No lean, necesitamos el objeto Mongoose para .save()
             if (!conversation) throw new ApiError(404, "Conversación referenciada no encontrada (inconsistencia después de validación).");
@@ -400,23 +421,21 @@ class MessageService {
         return conversation.toObject();
     }
 
-
-
-
-
     // MARK: - escalateConversationToAgent
     /**
-         * Escala una conversación a estado "pendiente de agente" y crea un mensaje de sistema con la razón y urgencia de la escalada.
-         * Si `escalatedByTool` es falso, se verifica que el usuario que realiza la acción sea admin/agente o el participante original.
-         * El usuario original debe ser participante de la conversación.
-         * @param {string} conversationId - ID de la conversación a escalar
-         * @param {string} userId - ID del participante original de la conversación
-         * @param {string} reason - Razón de la escalada
-         * @param {string} [urgency] - Urgencia de la escalada (opcional)
-         * @param {boolean} [escalatedByTool=false] - Si la escalada fue iniciada por una herramienta de IA
-         * @param {Object} requestingUser - Usuario que realiza la acción (IA via sistema, o un admin/agente manualmente)
-         * @returns {Promise<Object>} - La conversación actualizada
-         */
+     * Escala una conversación a estado "pendiente de agente" y crea un mensaje de sistema con la razón y urgencia de la escalada.
+     * Si `escalatedByTool` es falso, se verifica que el usuario que realiza la acción sea admin/agente o el participante original.
+     * El usuario original debe ser participante de la conversación.
+     * 
+     * @param {string} conversationId - ID de la conversación a escalar
+     * @param {string} userId - ID del participante original de la conversación
+     * @param {string} reason - Razón de la escalada
+     * @param {string} urgency - Urgencia de la escalada
+     * @param {boolean} [escalatedByTool=false] - Si la escalada fue iniciada por una herramienta de IA
+     * @param {Object} requestingUser - Usuario que realiza la acción (IA via sistema, o un admin/agente manualmente)
+     * @returns {Promise<Object>} - La conversación actualizada
+     * @throws {ApiError} - Si la conversación no se encuentra o si el usuario no tiene permiso para escalar
+     */
     async escalateConversationToAgent(conversationId, userId, reason, urgency, escalatedByTool = false, requestingUser) {
         //? requestingUser es quien realiza la acción (IA via sistema, o un admin/agente manualmente)
         // userId es el participante original de la conversación que se está escalando.
@@ -428,20 +447,40 @@ class MessageService {
             throw new ApiError(403, 'El usuario especificado no es participante de esta conversación.');
         }
         //? Si no es escalado por herramienta, quien lo escala debe ser admin/agente o el propio usuario (si permitimos auto-escalada)
-        if (!escalatedByTool && requestingUser.role !== 'admin' && requestingUser.role !== 'agent') {
+        if (!escalatedByTool && (!requestingUser || !['admin', 'agent'].includes(requestingUser.role))) {
             throw new ApiError(403, 'No tienes permiso para escalar esta conversación.');
         }
 
         //? Cambiar el estado de la conversación a 'pending_agent' y agregar detalles de escalación en metadata
         conversation.status = 'pending_agent';
         conversation.metadata = conversation.metadata || {};
+
+        // Validar y sanitizar urgency
+        let validUrgency = null;
+        const allowedUrgencies = ['low', 'medium', 'high'];
+        if (urgency && allowedUrgencies.includes(urgency.toLowerCase())) {
+            validUrgency = urgency.toLowerCase();
+        } else {
+            console.warn(`Escalation: Urgencia inválida '${urgency}' recibida de la IA. Usando 'medium' por defecto.`);
+            validUrgency = 'medium'; // Default si no viene nada de la IA
+        }
+
         conversation.metadata.escalationDetails = {
             reason,
-            urgency: urgency || null,
+            urgency: validUrgency,
             escalatedByTool,
             escalationTimestamp: new Date(),
         };
         conversation.updatedAt = Date.now();
+
+        //? Guardar la conversación ANTES de intentar crear el mensaje de sistema
+        // para que si la creación del mensaje falla, el estado de escalación ya esté guardado.
+        try {
+            await conversation.save();
+        } catch (validationError) {
+            console.error("Error de validación al guardar conversación escalada:", validationError);
+            throw validationError; // Relanzar para que AIService lo capture
+        }
 
         //? Crear mensaje de sistema. El `requestingUser` para `createMessage` será 'system'.
         await this.createMessage({
@@ -451,13 +490,9 @@ class MessageService {
             type: 'systemNotification',
         }, { _id: null, role: 'system' }); // Usuario "sistema"
 
-        await conversation.save();
-
         //? Devolver la conversación actualizada
         return conversation.toObject();
     }
-
-
 
     // MARK: - assignAgentToConversation
     /**
@@ -525,7 +560,6 @@ class MessageService {
             .sort({ 'metadata.escalationDetails.urgency': 1, updatedAt: -1 }) // Priorizar por urgencia, luego por más antiguo
             .lean();
     }
-
 
     // MARK: - updateConversationMetadata - título, tags y prioridad
     /**
@@ -658,6 +692,143 @@ class MessageService {
 
         //? 2. Devolver la conversación actualizada
         return convToUpdate.toObject();
+    }
+
+    // MARK: - createOrGetConversation
+    /**
+     * Busca una conversación existente entre dos usuarios o crea una nueva si no existe.
+     * @param {string} senderId - ID del usuario que inicia la conversación.
+     * @param {string} recipientId - ID del usuario con quien se desea conversar.
+     * @returns {Promise<Object>} - La conversación encontrada o creada.
+     * @throws {ApiError} Si el destinatario no es válido o si ocurre un error al crear la conversación.
+     */
+    async createOrGetConversation(senderId, recipientId) {
+        // 1. Validar que los IDs sean diferentes
+        if (senderId.toString() === recipientId.toString()) {
+            throw new ApiError(400, "No puedes iniciar una conversación contigo mismo.");
+        }
+
+        // 2. Validar que el recipientId sea un usuario válido
+        const recipient = await User.findById(recipientId);
+        if (!recipient) {
+            throw new ApiError(404, "El usuario destinatario no existe.");
+        }
+
+        // 3. Buscar conversación existente entre los dos participantes
+        let conversation = await Conversation.findOne({
+            type: 'user-to-user',
+            participants: { $all: [senderId, recipientId] }
+        }).populate('participants', 'name email').lean();
+
+        // 4. Si no existe, crear una nueva
+        if (!conversation) {
+            conversation = await Conversation.create({
+                participants: [senderId, recipientId],
+                type: 'user-to-user',
+                status: 'open',
+                lastMessageAt: new Date(),
+            });
+            // Poblar los participantes para la respuesta
+            conversation = await Conversation.findById(conversation._id)
+                .populate('participants', 'name email').lean();
+        }
+
+        return conversation;
+    }
+
+    // MARK: - searchUsers
+    /**
+     * Busca usuarios por nombre o email.
+     * @param {string} searchTerm - Término de búsqueda.
+     * @param {string} currentUserId - ID del usuario que realiza la búsqueda (para excluirlo de los resultados).
+     * @param {number} [limit=10] - Límite de resultados.
+     * @param {number} [page=1] - Página de resultados.
+     * @returns {Promise<Object>} - Objeto con los usuarios encontrados, total, página actual y total de páginas.
+     */
+    async searchUsers(searchTerm, currentUserId, { limit = 10, page = 1 }) {
+        const skip = (page - 1) * limit;
+        const query = {
+            _id: { $ne: currentUserId }, // Excluir al usuario que busca
+            $or: [
+                { name: { $regex: searchTerm, $options: 'i' } },
+                { email: { $regex: searchTerm, $options: 'i' } }
+            ]
+        };
+
+        const users = await User.find(query)
+            .select('name email role') // Seleccionar solo los campos necesarios
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
+
+        const total = await User.countDocuments(query);
+
+        return { users, total, currentPage: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / limit) };
+    }
+
+    // MARK: - searchUsers
+    /**
+     * Busca usuarios por nombre o email.
+     * @param {string} searchTerm - Término de búsqueda.
+     * @param {string} currentUserId - ID del usuario que realiza la búsqueda (para excluirlo de los resultados).
+     * @param {number} [limit=10] - Límite de resultados.
+     * @param {number} [page=1] - Página de resultados.
+     * @returns {Promise<Object>} - Objeto con los usuarios encontrados, total, página actual y total de páginas.
+     */
+    async searchUsers(searchTerm, currentUserId, { limit = 10, page = 1 }) {
+        const skip = (page - 1) * limit;
+        const query = {
+            _id: { $ne: currentUserId }, // Excluir al usuario que busca
+            $or: [
+                { name: { $regex: searchTerm, $options: 'i' } },
+                { email: { $regex: searchTerm, $options: 'i' } }
+            ]
+        };
+
+        const users = await User.find(query)
+            .select('name email role') // Seleccionar solo los campos necesarios
+            .skip(skip)
+            .limit(parseInt(limit))
+            .lean();
+
+        const total = await User.countDocuments(query);
+
+        return { users, total, currentPage: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / limit) };
+    }
+
+    // MARK: - findOrCreateConversation
+    /**
+     * Busca una conversación existente entre dos usuarios o crea una nueva si no existe.
+     * @param {string} user1Id - ID del primer usuario.
+     * @param {string} user2Id - ID del segundo usuario.
+     * @returns {Promise<Object>} - La conversación encontrada o creada.
+     */
+    async findOrCreateConversation(user1Id, user2Id) {
+        // Asegurarse de que los IDs sean de tipo ObjectId
+        const u1Id = new mongoose.Types.ObjectId(user1Id);
+        const u2Id = new mongoose.Types.ObjectId(user2Id);
+
+        // Buscar una conversación user-to-user entre los dos participantes
+        let conversation = await Conversation.findOne({
+            type: 'user-to-user',
+            participants: { $all: [u1Id, u2Id], $size: 2 }
+        }).lean();
+
+        if (!conversation) {
+            // Si no existe, crear una nueva conversación
+            conversation = await Conversation.create({
+                type: 'user-to-user',
+                participants: [u1Id, u2Id],
+                status: 'active', // Las conversaciones directas inician como activas
+                metadata: {
+                    title: `Chat entre ${user1Id} y ${user2Id}` // Título genérico, se puede mejorar
+                }
+            });
+            // Asegurarse de que el objeto devuelto sea plano
+            conversation = conversation.toObject();
+        }
+
+        return conversation;
     }
 }
 

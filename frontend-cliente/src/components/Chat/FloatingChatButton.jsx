@@ -1,14 +1,14 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { TiendaContext } from '../../context/TiendaContext';
-import { ChatContext } from '../../context/ChatContext';
+import { ChatContext } from '../../context/chat/ChatContext';
+import { useAuth } from '../../context/AuthContext';
 import ConversationList from './ConversationList';
 import ChatArea from './User-Chat/ChatArea';
 import AIAssistantChat from './AI-Chat/AIAssistantChat';
 import './FloatingChatButton.css';
 
 const FloatingChatButton = () => {
-  const { token } = useContext(TiendaContext);
-  const { conversations, showingAIChat, startAIChat } = useContext(ChatContext);
+  const { isAuthenticated } = useAuth();
+  const { conversations, selectAIChat, isAIChatActive } = useContext(ChatContext);
 
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -22,7 +22,7 @@ const FloatingChatButton = () => {
   }, [conversations]);
 
   // No mostrar el botón si el usuario no está logeado
-  if (!token) {
+  if (!isAuthenticated) {
     return null;
   }
 
@@ -55,7 +55,7 @@ const FloatingChatButton = () => {
         <button
           className="floating-ai-button"
           onClick={() => {
-            startAIChat();
+            selectAIChat();
             setIsOpen(true);
           }}
           aria-label="Asistente IA"
@@ -76,7 +76,7 @@ const FloatingChatButton = () => {
       <div className={`floating-chat-panel ${isOpen ? 'open' : ''}`}>
         <div className="floating-chat-container">
           <ConversationList />
-          {showingAIChat ? <AIAssistantChat /> : <ChatArea />}
+          {isAIChatActive ? <AIAssistantChat /> : <ChatArea />}
         </div>
       </div>
 

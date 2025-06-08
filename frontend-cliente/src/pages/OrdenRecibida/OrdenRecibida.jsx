@@ -1,4 +1,3 @@
-import React from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 const OrdenRecibida = () => {

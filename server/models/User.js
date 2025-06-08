@@ -76,5 +76,13 @@ userSchema.methods.cleanupRefreshTokens = function () {
     return this.save();
 };
 
+userSchema.set('toJSON', {
+    transform: (document, returnedObject) => {
+        delete returnedObject.passwordHash;
+        delete returnedObject.refreshTokens;
+        return returnedObject;
+    }
+});
+
 const User = mongoose.model('User', userSchema);
 export default User;

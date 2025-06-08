@@ -4,8 +4,6 @@ import crypto from 'crypto'; // Para generar el refresh token aleatorio
 import config from '../config/index.js';
 import { ApiError } from '../utils/errorHandler.js';
 
-
-
 /**
  * Genera un Access Token JWT.
  *
@@ -18,8 +16,6 @@ const generateAccessToken = (userId) => {
     });
 };
 
-
-
 /**
  * Genera un Refresh Token seguro.
  *
@@ -30,7 +26,6 @@ const generateRefreshToken = () => {
 };
 
 
-
 // MARK: - sendRefreshTokenCookie
 /**
  * Envía el refresh token como cookie HttpOnly.
@@ -39,13 +34,27 @@ const generateRefreshToken = () => {
  * @param {string} token - Token de refresco a enviar
  */
 const sendRefreshTokenCookie = (res, token) => {
+    console.log('Attempting to set refresh token cookie with:', {
+        name: config.jwt.refreshCookieName,
+        value: token,
+        options: {
+            httpOnly: true,
+            secure: config.env === 'production', // Solo en HTTPS en producción
+            sameSite: 'lax', // Mitiga CSRF
+            path: '/',
+            domain: 'localhost',
+            maxAge: config.jwt.refreshExpiresIn,
+        }
+    });
     res.cookie(config.jwt.refreshCookieName, token, {
         httpOnly: true, // El cliente JS no puede acceder
         secure: config.env === 'production', // Solo en HTTPS en producción
-        sameSite: 'strict', // Mitiga CSRF
-        path: `${config.apiPrefix || '/api/v1'}/auth/refresh-token`, // Alcance de la cookie
-        maxAge: parseInt(config.jwt.refreshExpiresIn) * 24 * 60 * 60 * 1000, // ej: 7 * 24 * 60 * 60 * 1000 para 7 días
+        sameSite: 'lax', // Mitiga CSRF
+        path: '/',
+        domain: 'localhost', // Añadir dominio explícito para localhost
+        maxAge: config.jwt.refreshExpiresIn,
     });
+    console.log('Refresh token enviado como cookie', token);
 };
 
 
@@ -95,7 +104,7 @@ export const register = async (req, res, next) => {
         // Generar tokens
         const accessToken = generateAccessToken(user._id);
         const refreshTokenValue = generateRefreshToken();
-        const refreshTokenExpires = new Date(Date.now() + parseInt(config.jwt.refreshExpiresIn) * 24 * 60 * 60 * 1000);
+        const refreshTokenExpires = new Date(Date.now() + config.jwt.refreshExpiresIn);
 
         user.refreshTokens.push({ token: refreshTokenValue, expiresAt: refreshTokenExpires });
         await user.cleanupRefreshTokens(); // Limpiar tokens viejos y guardar
@@ -147,10 +156,10 @@ export const login = async (req, res, next) => {
         if (!user) {
             return next(new ApiError(401, 'Email o contraseña incorrectos.'));
         }
-        
+
         const isPasswordMatch = await user.comparePassword(password);
         console.log('Password match result:', isPasswordMatch);
-        
+
         if (!isPasswordMatch) {
             return next(new ApiError(401, 'Email o contraseña incorrectos.'));
         }
@@ -160,7 +169,7 @@ export const login = async (req, res, next) => {
 
         const accessToken = generateAccessToken(user._id);
         const refreshTokenValue = generateRefreshToken();
-        const refreshTokenExpires = new Date(Date.now() + parseInt(config.jwt.refreshExpiresIn) * 24 * 60 * 60 * 1000);
+        const refreshTokenExpires = new Date(Date.now() + config.jwt.refreshExpiresIn);
 
         user.refreshTokens.push({ token: refreshTokenValue, expiresAt: refreshTokenExpires });
         await user.save();
@@ -207,15 +216,15 @@ export const refreshToken = async (req, res, next) => {
         const user = await User.findOne({
             'refreshTokens.token': incomingRefreshToken,
             'refreshTokens.expiresAt': { $gt: new Date() }
-        }).select('+refreshTokens'); // Asegurarse de traer refreshTokens
+        }).select('+refreshTokens'); // asegurar traer refreshTokens
 
         if (!user) {
             // Limpiar la cookie si el token no es válido
             res.clearCookie(config.jwt.refreshCookieName, {
                 httpOnly: true,
                 secure: config.env === 'production',
-                sameSite: 'strict',
-                path: `${config.apiPrefix || '/api/v1'}/auth/refresh-token`
+                sameSite: 'lax',
+                path: `${config.apiPrefix || '/api/v1'}`,
             });
             return next(new ApiError(403, 'Token de refresco inválido o expirado.'));
         }
@@ -225,7 +234,7 @@ export const refreshToken = async (req, res, next) => {
 
         // Rotación de Refresh Token (mayor seguridad)
         const newRefreshTokenValue = generateRefreshToken();
-        const newRefreshTokenExpires = new Date(Date.now() + parseInt(config.jwt.refreshExpiresIn) * 24 * 60 * 60 * 1000);
+        const newRefreshTokenExpires = new Date(Date.now() + config.jwt.refreshExpiresIn);
 
         // Actualizar el refresh token en la DB
         user.refreshTokens = user.refreshTokens.filter(rt => rt.token !== incomingRefreshToken); // Remover el viejo
@@ -306,8 +315,8 @@ export const logout = async (req, res, next) => {
     res.clearCookie(config.jwt.refreshCookieName, {
         httpOnly: true,
         secure: config.env === 'production',
-        sameSite: 'strict',
-        path: `${process.env.API_PREFIX || '/api/v1'}/auth/refresh-token`,
+        sameSite: 'lax',
+        path: `${process.env.API_PREFIX || '/api/v1'}`,
     });
 
     res.status(200).json({ success: true, message: "Logout exitoso." });

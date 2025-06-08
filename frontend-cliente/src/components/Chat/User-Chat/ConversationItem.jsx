@@ -1,69 +1,83 @@
 import React, { useContext } from 'react';
-import { ChatContext } from '../../../context/ChatContext';
+import { ChatContext } from '../../../context/chat/ChatContext'; // Ajusta la ruta si es necesario
+import { useAuth } from '../../../context/AuthContext';
 import './ConversationItem.css';
 
-const ConversationItem = ({ conversation, active }) => {
-  const { startConversation, isOnline, isTyping } = useContext(ChatContext);
+const ConversationItem = ({ conversation, active, onSelect }) => {
 
-  // Formatear la fecha del último mensaje
+  const { isTyping } = useContext(ChatContext);
+  const { user: currentUser } = useAuth();
+
+  if (!conversation || !currentUser) return null;
+
+  // Determinar el "otro" participante para mostrar nombre e info
+  let displayUser = null;
+  if (conversation.type === 'user-to-user' || conversation.type === 'user-to-agent') {
+    displayUser = conversation.participants?.find(p => p._id !== currentUser._id);
+  }
+  // Para 'user-to-ia', el backend podría no popular 'participants' con un objeto User para la IA.
+  // El nombre se tomaría de conversation.name o conversation.modelId.
+  // Pero este componente ahora filtra conversaciones 'user-to-ia'.
+
+  const displayName = displayUser?.name || conversation.name || 'Chat Desconocido';
+  const displayAvatarChar = displayName.charAt(0).toUpperCase();
+  const otherUserId = displayUser?._id;
+
   const formatLastMessageTime = (timestamp) => {
     if (!timestamp) return '';
-    
     const messageDate = new Date(timestamp);
     const today = new Date();
-    
-    // Si es hoy, mostrar la hora
     if (messageDate.toDateString() === today.toDateString()) {
       return messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
-    
-    // Si es ayer, mostrar "Ayer"
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
-    if (messageDate.toDateString() === yesterday.toDateString()) {
-      return 'Ayer';
-    }
-    
-    // Si es este año, mostrar día y mes
+    if (messageDate.toDateString() === yesterday.toDateString()) return 'Ayer';
     if (messageDate.getFullYear() === today.getFullYear()) {
-      return messageDate.toLocaleDateString([], { day: '2-digit', month: '2-digit' });
+      return messageDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
     }
-    
-    // Si es otro año, mostrar fecha completa
     return messageDate.toLocaleDateString();
   };
 
+  const lastMessageContent = conversation.lastMessage?.content || 'No hay mensajes aún.';
+  const lastMessageTime = conversation.lastMessage?.createdAt || conversation.updatedAt;
+
+  // El `unreadCount` debe ser específico para el `currentUser`
+  const unreadForCurrentUser = conversation.unreadCounts?.find(uc => uc.userId === currentUser._id)?.count || 0;
+
   return (
-    <div 
+    <div
       className={`conversation-item ${active ? 'active' : ''}`}
-      onClick={() => startConversation(conversation)}
+      onClick={onSelect}
     >
       <div className="conversation-avatar">
-        <span className="avatar-placeholder">
-          {conversation.name.charAt(0).toUpperCase()}
-        </span>
-        {isOnline(conversation._id) && <span className="online-indicator"></span>}
+        <span className="avatar-placeholder">{displayAvatarChar}</span>
+        {/* isOnline no está implementado en el backend actual, lo comento */}
+        {/* {isOnline(otherUserId) && <span className="online-indicator"></span>} */}
       </div>
-      
+
       <div className="conversation-info">
         <div className="conversation-header">
-          <h4 className="conversation-name">{conversation.name}</h4>
-          {conversation.lastMessageTime && (
+          <h4 className="conversation-name">{displayName}</h4>
+          {lastMessageTime && (
             <span className="conversation-time">
-              {formatLastMessageTime(conversation.lastMessageTime)}
+              {formatLastMessageTime(lastMessageTime)}
             </span>
           )}
         </div>
-        
+
         <div className="conversation-preview">
-          {isTyping(conversation._id) ? (
+          {otherUserId && isTyping(conversation._id, otherUserId) ? (
             <span className="typing-indicator">Escribiendo...</span>
           ) : (
-            <p className="last-message">{conversation.lastMessage || 'No hay mensajes'}</p>
+            <p className="last-message" title={lastMessageContent}>
+                {conversation.lastMessage?.senderId?._id === currentUser._id ? "Tú: " : ""}
+                {lastMessageContent}
+            </p>
           )}
-          
-          {conversation.unreadCount > 0 && (
-            <span className="unread-badge">{conversation.unreadCount}</span>
+
+          {unreadForCurrentUser > 0 && (
+            <span className="unread-badge-item">{unreadForCurrentUser}</span>
           )}
         </div>
       </div>

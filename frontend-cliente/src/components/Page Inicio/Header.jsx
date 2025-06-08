@@ -1,4 +1,3 @@
-import React from 'react'
 import header_img from '/header_img.png'
 import SimpleParallax from 'simple-parallax-js'
 

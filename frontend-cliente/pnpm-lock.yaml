@@ -30,8 +30,8 @@ importers:
         specifier: ^7.5.3
         version: 7.5.3(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       simple-parallax-js:
-        specifier: ^6.1.1
-        version: 6.1.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+        specifier: ^6.2.1
+        version: 6.2.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       socket.io-client:
         specifier: ^4.8.1
         version: 4.8.1
@@ -1115,8 +1115,8 @@ packages:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
 
-  simple-parallax-js@6.1.1:
-    resolution: {integrity: sha512-jTuiAi0YL4xXuzwmJvueXibc2uFOiTJrAreO2scgu3/roOA4uOatWlwNCDJ23blO2AQWqF8fQAHA+eVL9vUETw==}
+  simple-parallax-js@6.2.1:
+    resolution: {integrity: sha512-d7D/r8bhxPcSPGgkMOfl3ByHqX/L4qtsvqnnyUMPRAIDWP75YYyeENq1Q8a2EFNAuTiD77oh4IgBHRt2hIqU/w==}
     peerDependencies:
       react: '>=17.0.0'
       react-dom: '>=17.0.0'
@@ -2106,7 +2106,7 @@ snapshots:
 
   shebang-regex@3.0.0: {}
 
-  simple-parallax-js@6.1.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
+  simple-parallax-js@6.2.1(react-dom@19.1.0(react@19.1.0))(react@19.1.0):
     dependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
