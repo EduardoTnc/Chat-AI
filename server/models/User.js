@@ -33,6 +33,15 @@ const userSchema = new mongoose.Schema({
     },
     cartData: { type: Object, default: {} },
     refreshTokens: [refreshTokenSchema], // Array para almacenar refresh tokens válidos
+    isDeleted: { 
+        type: Boolean,
+        default: false,
+        index: true,
+    },
+    deletedAt: { 
+        type: Date,
+        default: null,
+    }
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
@@ -41,6 +50,15 @@ userSchema.pre('save', async function (next) {
     }
     const salt = await bcrypt.genSalt(10);
     this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
+    next();
+});
+
+// Hook pre-find para filtrar automáticamente los borrados lógicamente
+userSchema.pre(/^find/, function(next) {
+    // Si la query no especifica lo contrario, solo mostrar los no borrados
+    if (this.getOptions().withDeleted !== true) {
+        this.where({ isDeleted: { $ne: true } });
+    }
     next();
 });
 

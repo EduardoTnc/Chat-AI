@@ -1,5 +1,5 @@
 import orderModel from "../models/orderModel.js";
-import userModel from "../models/User.js";
+import User from "../models/User.js";
 
 // Tomar orden del frontend
 const placeOrder = async (req, res) => {
@@ -19,7 +19,7 @@ const placeOrder = async (req, res) => {
         })
         console.log(newOrder)
         await newOrder.save();
-        await userModel.findByIdAndUpdate(req.user._id, { cartData: {} })
+        await User.findByIdAndUpdate(req.user._id, { cartData: {} })
 
         // Lógica para procesar con la pasarela de pagos de Culqi
         if (req.body.paymentMethod === "Culqi") {

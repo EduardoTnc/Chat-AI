@@ -1,4 +1,4 @@
-import userModel from "../models/User.js";
+import User from "../models/User.js";
 
 /**
  * Agrega un item al carrito de un usuario.
@@ -9,7 +9,7 @@ import userModel from "../models/User.js";
  */
 const addToCart = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.user._id)
+    let userData = await User.findById(req.user._id)
     let cartData = await userData.cartData;
 
     if (!cartData[req.body.itemId]) {
@@ -18,7 +18,7 @@ const addToCart = async (req, res) => {
       cartData[req.body.itemId]++
     }
 
-    await userModel.findByIdAndUpdate(req.user._id, { cartData })
+    await User.findByIdAndUpdate(req.user._id, { cartData })
     res.json({ success: true, message: "Item agregado al carrito" })
 
   } catch (error) {
@@ -36,14 +36,14 @@ const addToCart = async (req, res) => {
  */
 const removeFromCart = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.user._id)
+    let userData = await User.findById(req.user._id)
     let cartData = await userData.cartData;
 
     if (cartData[req.body.itemId] > 0) {
       cartData[req.body.itemId]--
     }
 
-    await userModel.findByIdAndUpdate(req.user._id, { cartData })
+    await User.findByIdAndUpdate(req.user._id, { cartData })
     res.json({ success: true, message: "Item quitado del carrito" })
 
   } catch (error) {
@@ -61,7 +61,7 @@ const removeFromCart = async (req, res) => {
  */
 const getCart = async (req, res) => {
   try {
-    let userData = await userModel.findById(req.user._id)
+    let userData = await User.findById(req.user._id)
 
     let cartData = await userData.cartData;
     res.json({ success: true, cartData })
@@ -82,7 +82,7 @@ const clearCart = async (req, res) => {
   try {
     let cartData = {};
 
-    await userModel.findByIdAndUpdate(req.user._id, { cartData })
+    await User.findByIdAndUpdate(req.user._id, { cartData })
     res.json({ success: true, message: "Carrito vaciado" })
 
   } catch (error) {

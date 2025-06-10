@@ -35,7 +35,7 @@ const startServer = async () => {
     if (config.env !== 'test') {
         httpServer.listen(config.port, () => {
             console.log(chalk.bold.cyan('\n==========================================='));
-            console.log(chalk.bold.green(' 💬      CHAT MODULE BACKEND      💬'));
+            console.log(chalk.bold.green('            CHAT MODULE BACKEND            '));
             console.log(chalk.bold.cyan('===========================================\n'));
             console.log(chalk.yellow.bold('🔗 URLs:'));
             console.log(chalk.green(`  → API URL:          ${chalk.white(`http://localhost:${config.port}${process.env.API_PREFIX || '/api/v1'}`)}`));

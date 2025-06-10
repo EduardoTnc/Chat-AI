@@ -10,9 +10,9 @@ const TiendaContextProvider = (props) => {
   const [listaPlatos, setListaPlatos] = useState([]);
 
   useEffect(() => {
-    // fecthListaPlatos();
+    fecthListaPlatos();
     if (token) {
-      // cargarCarrito(token);
+      cargarCarrito(token);
     }
   }, [token]);
 

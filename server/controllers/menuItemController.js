@@ -1,5 +1,6 @@
 import menuItemModel from "../models/menuItemModel.js"
 import fs from 'fs'
+import { ApiError } from "../utils/errorHandler.js";
 
 // agregra un menuItem
 const addMenuItem = async (req, res) => {
@@ -46,19 +47,23 @@ const listMenuItem = async (req, res) => {
   }
 }
 
-// elimina un menuItem
-const removeMenuItem = async (req, res) => {
+// elimina (lógicamente) un menuItem
+const removeMenuItem = async (req, res, next) => {
   try {
-    const menuItem = await menuItemModel.findByIdAndDelete(req.params.id)
-    fs.unlinkSync(`uploads/${menuItem.imageUrl}`, () => {
-      console.log("Archivo eliminado")
-    })
-    res.json({success: true , message: "menuItem eliminado correctamente", menuItem})
+    const menuItem = await menuItemModel.findByIdAndUpdate(
+      req.params.id,
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
+    if (!menuItem) {
+      return next(new ApiError(404, 'Menu Item no encontrado.'));
+    }
+    // No eliminar la imagen físicamente, podrías querer restaurarla.
+    res.json({ success: true, message: "MenuItem eliminado lógicamente", data: menuItem });
   } catch (error) {
-    console.log(error)
-    res.json({success: false , message: "Error al eliminar el menuItem"})
+    next(error);
   }
-}
+};
 
 // actualiza un menuItem
 const updateMenuItem = async (req, res) => {

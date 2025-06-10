@@ -8,8 +8,17 @@ const orderSchema = new mongoose.Schema({
   paymentMethod: { type: String, required: true },
   payment: { type: Boolean, default: false },
   status: { type: String, default: "Procesando Orden" },
-  date: { type: Date, default: Date.now }
-})
+  isDeleted: { type: Boolean, default: false, index: true },
+  deletedAt: { type: Date, default: null },
+}, { timestamps: true });
+
+// Hook pre-find para soft delete
+orderSchema.pre(/^find/, function(next) {
+    if (this.getOptions().withDeleted !== true) {
+        this.where({ isDeleted: { $ne: true } });
+    }
+    next();
+});
 
 const orderModel = mongoose.models.order || mongoose.model("order", orderSchema)
 
