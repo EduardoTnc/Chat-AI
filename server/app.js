@@ -14,7 +14,10 @@ import authRouter from "./routes/authRoutes.js";
 import chatApiRouter from "./routes/chatApiRoutes.js";
 import aiApiRouter from "./routes/aiApiRoutes.js";
 import adminApiRouter from "./routes/adminApiRoutes.js";
-// ... IMPORTA AQUÍ OTRAS RUTAS DE TU APLICACIÓN ...
+
+import menuItemRouter from "./routes/menuItemRoutes.js";
+import cartRouter from "./routes/cartRoutes.js";
+import orderRouter from "./routes/orderRoutes.js";
 
 const app = express();
 
@@ -54,15 +57,16 @@ if (config.env !== 'test') { // No mostrar logs de Morgan durante los tests
 app.get("/", (req, res) => res.send(`Bienvenido al Backend del Chat. Documentación en /api-docs (si está configurada)`));
 
 // Rutas del módulo de Chat y Admin
-const apiPrefix = process.env.API_PREFIX || '/api/v1';
-app.use(`${apiPrefix}/auth`, authRouter);
-app.use(`${apiPrefix}/chat-api`, chatApiRouter);
-app.use(`${apiPrefix}/ai-api`, aiApiRouter);
-app.use(`${apiPrefix}/admin-api`, adminApiRouter);
 
-// ... AÑADE AQUÍ OTRAS RUTAS DE TU APLICACIÓN ...
-// ej: app.use(`${apiPrefix}/users", userRouter);
+app.use(`${config.apiPrefix}/auth`, authRouter);
+app.use(`${config.apiPrefix}/chat-api`, chatApiRouter);
+app.use(`${config.apiPrefix}/ai-api`, aiApiRouter);
+app.use(`${config.apiPrefix}/admin-api`, adminApiRouter);
 
+app.use(`${config.apiPrefix}/menu-items`, menuItemRouter)
+app.use(`${config.apiPrefix}/images`, express.static('uploads'))
+app.use(`${config.apiPrefix}/cart`, cartRouter)
+app.use(`${config.apiPrefix}/order`, orderRouter)
 
 // Middleware para rutas no encontradas (404)
 app.use(notFoundMiddleware);

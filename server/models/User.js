@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema({
         enum: ['user', 'admin', 'agent'],
         default: 'user',
     },
+    cartData: { type: Object, default: {} },
     refreshTokens: [refreshTokenSchema], // Array para almacenar refresh tokens válidos
 }, { timestamps: true });
 
@@ -55,7 +56,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
     }
     console.log('Comparing passwords - candidatePassword exists:', !!candidatePassword);
     console.log('Comparing with hashed password in DB:', this.passwordHash.substring(0, 10) + '...');
-    
+
     try {
         const isMatch = await bcrypt.compare(candidatePassword, this.passwordHash);
         console.log('Password comparison result:', isMatch);
