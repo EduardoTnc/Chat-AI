@@ -83,7 +83,48 @@
   padding: 15px;
   display: flex;
   flex-direction: column;
+
+  scroll-behavior: smooth;
+  /* Desplazamiento suave */
+
+  /* Ancho del scroll */
+  scrollbar-width: thin;
+  /* Para Firefox */
+  scrollbar-color: #c1c1c1 #f1f1f1;
+  /* Para Firefox */
 }
+
+/* Estilos para WebKit (Chrome, Safari, Edge) */
+.messages-container::-webkit-scrollbar {
+  width: 8px;
+  /* Ancho del scroll */
+}
+
+.messages-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  /* Color del fondo del track */
+  border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  /* Color del thumb (barra deslizadora) */
+  border-radius: 4px;
+}
+
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+  /* Color del thumb al pasar el mouse */
+}
+
+/* Para navegadores que no soportan scrollbar-width */
+@supports not (scrollbar-width: thin) {
+  .messages-container {
+    scrollbar-width: thin;
+    scrollbar-color: #c1c1c1 #f1f1f1;
+  }
+}
+
 
 .no-messages {
   display: flex;
@@ -131,6 +172,7 @@
   0% {
     transform: translateY(0px);
   }
+
   100% {
     transform: translateY(-5px);
   }

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef } from 'react';
 import { ChatContext } from '../../../context/chat/ChatContext';
 import { useAuth } from '../../../context/AuthContext';
 import MessageItem from '../MessageItem';
@@ -20,33 +20,74 @@ const ChatArea = () => {
 
   const messagesEndRef = useRef(null);
 
+  const messagesContainerRef = useRef(null);
+
+  const [isNearBottom, setIsNearBottom] = useState(true);
+
+  // Función para verificar si el scroll está cerca del final
+  const checkIfNearBottom = () => {
+    if (!messagesContainerRef.current) return true;
+
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const threshold = 100; // píxeles desde el fondo para considerar "cerca del final"
+    const isNear = scrollHeight - (scrollTop + clientHeight) < threshold;
+    setIsNearBottom(isNear);
+    return isNear;
+  };
+
+  /**
+   * Efecto para mantener el scroll al final de los mensajes cuando se recibe un nuevo mensaje
+   * o cuando el otro usuario está escribiendo, solo si el usuario está cerca del final.
+   * Se ejecuta cuando cambian los mensajes, la posición del scroll o el estado de typing.
+   */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-  }, [messages]);
+    if (isNearBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isNearBottom, isTyping]);
 
+  /**
+   * Efecto para ir al mensaje más reciente cuando se carga una conversación
+   * Se ejecuta cuando cambia el estado de loadingMessages.
+   */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!loadingMessages) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    }
+  }, [loadingMessages]);
 
-  }, [newMessageInput, isTyping]);
-
-
-  // Efecto para limpiar el estado de typing al desmontar o cambiar de conversación
+  /**
+   * Efecto para limpiar el estado de typing al desmontar o cambiar de conversación
+   * Se ejecuta cuando cambian la conversación.
+   */
   useEffect(() => {
     return () => {
-      // Cuando el componente se desmonte o cambie la conversación, detener el typing
       if (currentChat?.activeConversationId && currentChat?._id) {
         handleTypingEvent(false);
       }
     };
   }, [currentChat?.activeConversationId, currentChat?._id]);
 
+  /**
+   * Maneja el cambio de valor en el input de texto para el mensaje nuevo.
+   * Actualiza el estado de newMessageInput y, si hay un destinatario (currentChat),
+   * emite el evento de escritura (typing) con valor true.
+   * @param {object} e - Evento de cambio de valor en el input de texto
+   */
   const handleInputChange = (e) => {
     setNewMessageInput(e.target.value);
-    if (currentChat?.activeConversationId && currentChat?._id) { // Asegurar que hay un destinatario
+    if (currentChat?.activeConversationId && currentChat?._id) {
       handleTypingEvent(true);
     }
   };
 
+  /**
+   * Maneja el envío del formulario de texto para el mensaje nuevo.
+   * Previene el comportamiento por defecto del formulario,
+   * verifica que el mensaje no esté vacío y que haya un destinatario,
+   * y envía el mensaje al destinatario.
+   * @param {object} e - Evento de envío del formulario
+   */
   const handleFormSubmit = (e) => {
     e.preventDefault();
 
@@ -55,7 +96,12 @@ const ChatArea = () => {
     }
   };
 
-  if (!currentChat || !currentChat.activeConversationId) { // Si no hay una conversación activa seleccionada
+  /**
+   * Verifica si no hay una conversación activa seleccionada.
+   * Si no hay una conversación activa seleccionada, retorna un mensaje indicando que se debe seleccionar una conversación.
+   * @returns {ReactElement} - Un mensaje indicando que se debe seleccionar una conversación
+   */
+  if (!currentChat || !currentChat.activeConversationId) {
     return (
       <div className="empty-chat-area">
         <div className="empty-chat-message">
@@ -91,7 +137,7 @@ const ChatArea = () => {
         {/* Aquí podrías añadir opciones como ver perfil, etc. */}
       </div>
 
-      <div className="messages-container">
+      <div className="messages-container" ref={messagesContainerRef} onScroll={checkIfNearBottom}>
         {loadingMessages ? (
           <div className="loading-spinner" style={{ margin: 'auto' }}>Cargando mensajes...</div>
         ) : messages.length === 0 ? (

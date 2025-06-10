@@ -117,7 +117,7 @@ const seedData = async () => {
         // --- Crear API Keys (si es necesario, ej. para OpenAI) ---
         // NECESITARÁS TU API KEY REAL DE OPENAI AQUÍ (guardada en .env)
         // Y la clave de encriptación también en .env
-        const openAIApiKey = process.env.OPENAI_API_KEY_FOR_SEEDING; // Crea esta variable en tu .env
+        const openAIApiKey = process.env.OPENAI_API_KEY_FOR_SEEDING;
         const encryptionSecret = process.env.API_KEY_ENCRYPTION_SECRET;
 
         if (openAIApiKey && encryptionSecret) {

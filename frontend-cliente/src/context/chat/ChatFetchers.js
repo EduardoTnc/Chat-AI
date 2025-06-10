@@ -175,7 +175,7 @@ export const useChatFetchers = (
 
     // MARK: startConversation
     // Función para iniciar una nueva conversación
-    const startConversation = useCallback(async (targetUserId) => {
+    const startConversationAPI = useCallback(async (targetUserId) => {
         if (!token || !targetUserId) return;
 
         try {
@@ -218,6 +218,6 @@ export const useChatFetchers = (
         fetchMessages,
         fetchAIMessages,
         fetchAIModels,
-        startConversation
+        startConversationAPI
     };
 };

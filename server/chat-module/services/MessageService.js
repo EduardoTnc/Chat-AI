@@ -766,36 +766,6 @@ class MessageService {
         return { users, total, currentPage: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / limit) };
     }
 
-    // MARK: - searchUsers
-    /**
-     * Busca usuarios por nombre o email.
-     * @param {string} searchTerm - Término de búsqueda.
-     * @param {string} currentUserId - ID del usuario que realiza la búsqueda (para excluirlo de los resultados).
-     * @param {number} [limit=10] - Límite de resultados.
-     * @param {number} [page=1] - Página de resultados.
-     * @returns {Promise<Object>} - Objeto con los usuarios encontrados, total, página actual y total de páginas.
-     */
-    async searchUsers(searchTerm, currentUserId, { limit = 10, page = 1 }) {
-        const skip = (page - 1) * limit;
-        const query = {
-            _id: { $ne: currentUserId }, // Excluir al usuario que busca
-            $or: [
-                { name: { $regex: searchTerm, $options: 'i' } },
-                { email: { $regex: searchTerm, $options: 'i' } }
-            ]
-        };
-
-        const users = await User.find(query)
-            .select('name email role') // Seleccionar solo los campos necesarios
-            .skip(skip)
-            .limit(parseInt(limit))
-            .lean();
-
-        const total = await User.countDocuments(query);
-
-        return { users, total, currentPage: parseInt(page), limit: parseInt(limit), totalPages: Math.ceil(total / limit) };
-    }
-
     // MARK: - findOrCreateConversation
     /**
      * Busca una conversación existente entre dos usuarios o crea una nueva si no existe.

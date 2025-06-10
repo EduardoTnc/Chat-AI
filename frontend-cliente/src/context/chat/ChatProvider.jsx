@@ -12,6 +12,7 @@ const ChatContextProvider = ({ children }) => {
     // Obtener datos de autenticación
     const { urlBase, urlApi, token, user } = useAuth();
 
+    // MARK: Estados
     // Obtener estados y setters de ChatState
     const {
         // Estados básicos
@@ -34,34 +35,9 @@ const ChatContextProvider = ({ children }) => {
         tempMessageIdCounter, setTempMessageIdCounter
     } = useChatState();
 
-    // Inicializamos los manejadores del socket sin las dependencias circulares
-    const socketHandlers = useChatSocket(
-        urlBase,
-        token,
-        user,
-        socket,
-        setSocket,
-        setConversations,
-        setCurrentChat,
-        setMessages,
-        setOnlineUsers,
-        setTypingUsers,
-        setIsAIChatActive,
-        setAiConversationId
-    );
-
-    // Obtener acciones desde ChatActions
-    const {
-        selectConversation,
-        selectAIChat,
-        sendMessageToUser,
-        sendMessageToIA,
-        markConversationAsRead,
-        updateConversations,
-        addMessage,
-        requestNotificationPermission
-    } = useChatActions(
-        socket,
+    // Primero obtenemos las acciones básicas sin socket para obtener markConversationAsRead
+    const initialActions = useChatActions(
+        null, // Pasamos null inicialmente para el socket
         setCurrentChat,
         setMessages,
         setIsAIChatActive,
@@ -82,13 +58,37 @@ const ChatContextProvider = ({ children }) => {
         selectedAIModel
     );
 
+    // Extraemos markConversationAsRead de las acciones iniciales
+    const { markConversationAsRead } = initialActions;
+
+    // MARK: Socket
+    // Inicializamos el socket con markConversationAsRead
+    const socketHandlers = useChatSocket(
+        urlBase,
+        token,
+        user,
+        socket,
+        setSocket,
+        conversations,
+        setConversations,
+        currentChat,
+        setCurrentChat,
+        setMessages,
+        setOnlineUsers,
+        setTypingUsers,
+        setIsAIChatActive,
+        setAiConversationId,
+        markConversationAsRead
+    );
+
+    // MARK: Fetchers
     // Obtener funciones para llamadas a la API desde ChatFetchers
     const {
         fetchConversations,
         fetchMessages,
         fetchAIMessages,
         fetchAIModels,
-        startConversation: startConversationAPI
+        startConversationAPI
     } = useChatFetchers(
         urlApi,
         token,
@@ -99,6 +99,40 @@ const ChatContextProvider = ({ children }) => {
         setAiModels
     );
 
+    // MARK: Acciones
+    // Obtener acciones desde ChatActions
+    const {
+        selectConversation,
+        selectAIChat,
+        sendMessageToUser,
+        sendMessageToIA,
+        requestNotificationPermission,
+    } = useChatActions(
+        socket, // Ahora pasamos el socket real
+        setCurrentChat,
+        setMessages,
+        setIsAIChatActive,
+        setAiConversationId,
+        tempMessageIdCounter,
+        setTempMessageIdCounter,
+        conversations,
+        setConversations,
+        setIsAISending,
+        setNewMessageInput,
+        urlApi,
+        token,
+        user,
+        currentChat,
+        isAIChatActive,
+        isAISending,
+        aiConversationId,
+        selectedAIModel,
+        startConversationAPI
+    );
+
+
+
+    // MARK: Selectores
     // Obtener selectores desde ChatSelectors
     const {
         isUserOnline,
@@ -112,18 +146,19 @@ const ChatContextProvider = ({ children }) => {
         user
     );
 
+    // MARK: useEffect
     // Extraer las funciones del manejador de socket
     const { setupSocketListeners, handleTypingEvent } = socketHandlers;
 
     // Actualizar los manejadores de socket con las funciones de acciones
     useEffect(() => {
-        if (socket && addMessage && updateConversations) {
-            // Ahora podemos conectar addMessage y updateConversations
-            const cleanup = async () => await setupSocketListeners(socket, addMessage, updateConversations);
-            cleanup();
-            return cleanup;
+        if (socket) {
+            // setupSocketListeners returns a cleanup function directly
+            const cleanupListeners = setupSocketListeners(socket);
+            // Return this cleanup function so useEffect can call it on unmount or when dependencies change
+            return cleanupListeners;
         }
-    }, [socket, setupSocketListeners, addMessage, updateConversations]);
+    }, [socket, setupSocketListeners]);
 
     // Cargar conversaciones y modelos de IA cuando hay un token válido
     useEffect(() => {
@@ -147,25 +182,25 @@ const ChatContextProvider = ({ children }) => {
         }
     }, [isAIChatActive, aiConversationId]);
 
-
     // Manejar eventos de escritura cuando cambia el input de mensaje
     const prevMessageInputRef = useRef('');
-    
+
     useEffect(() => {
         if (socket && currentChat && !isAIChatActive) {
             const wasTyping = prevMessageInputRef.current.length > 0;
             const isTyping = newMessageInput.length > 0;
-            
+
             // Solo emitir evento si el estado de typing ha cambiado
             if (wasTyping !== isTyping) {
-                socketHandlers.handleTypingEvent(isTyping, currentChat, isAIChatActive);
+                handleTypingEvent(isTyping, currentChat, isAIChatActive);
             }
-            
+
             // Actualizar la referencia con el valor actual
             prevMessageInputRef.current = newMessageInput;
         }
     }, [socket, currentChat, newMessageInput, isAIChatActive, socketHandlers]);
 
+    // MARK: Funciones
     // Iniciar conversación con un usuario
     const startConversation = async (targetUser) => {
         console.log("startConversation - Target user:", targetUser);
@@ -197,6 +232,7 @@ const ChatContextProvider = ({ children }) => {
         }
     };
 
+    // MARK: Context
     // Valores a exponer en el contexto
     const contextValue = {
         // Estado básico
@@ -222,7 +258,6 @@ const ChatContextProvider = ({ children }) => {
         selectConversation,
         startConversation,
         sendMessageToUser,
-        markConversationAsRead,
         requestNotificationPermission,
 
         // Acciones de chat con IA

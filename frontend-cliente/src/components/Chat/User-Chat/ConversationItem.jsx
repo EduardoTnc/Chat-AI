@@ -68,7 +68,7 @@ const ConversationItem = ({ conversation, active, onSelect }) => {
 
         <div className="conversation-preview">
           {otherUserId && isTyping(conversation._id, otherUserId) ? (
-            <span className="typing-indicator">Escribiendo...</span>
+            <span className="typing-indicator-item">Escribiendo...</span>
           ) : (
             <p className="last-message" title={lastMessageContent}>
                 {conversation.lastMessage?.senderId?._id === currentUser._id ? "Tú: " : ""}

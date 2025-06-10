@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import axios from 'axios';
 
 export const useChatActions = (
     socket,
@@ -19,7 +20,8 @@ export const useChatActions = (
     isAIChatActive,
     isAISending,
     aiConversationId,
-    selectedAIModel
+    selectedAIModel,
+    startConversationAPI
 ) => {
 
     // MARK: selectConversation
@@ -61,7 +63,6 @@ export const useChatActions = (
         // Marcar como leído si hay mensajes no leídos
 
         if ((conversation.unreadCounts?.find(uc => uc.userId === user._id)?.count || 0) > 0) {
-            console.log('Marcando conversación como leída desde selectConversation', conversation.unreadCounts?.find(uc => uc.userId === user._id)?.count || 0);
             markConversationAsRead(conversation._id);
         }
     }, [user?._id, currentChat]);
@@ -113,13 +114,18 @@ export const useChatActions = (
             console.log('Respuesta del servidor:', response);
             if (response.success) {
                 console.log('Mensaje enviado exitosamente, mensaje creado y guardado:', response.message);
+
                 // Reemplazar el mensaje temporal con el real recibido
                 setMessages(prev => prev.map(msg =>
                     msg._id === tempId ? { ...response.message, temporary: false } : msg
                 ));
 
-                // Actualizar la conversación en la lista
-                updateConversations(response.message);
+                // Actualizar el lastMessage de la conversación
+                setConversations(prev => prev.map(conv =>
+                    conv._id === currentChat.activeConversationId ? { ...conv, lastMessage: response.message } : conv
+                ));
+
+
             } else {
                 console.error('Error al enviar mensaje:', response.message);
                 // Marcar el mensaje como fallido en la UI
@@ -229,85 +235,40 @@ export const useChatActions = (
     // MARK: markConversationAsRead
     // Función para marcar conversación como leída
     const markConversationAsRead = useCallback(async (conversationId) => {
-        if (!socket || !conversationId) return;
+        if (!token || !conversationId) return;
 
-        console.log(`Marcando conversación ${conversationId} como leída`);
+        try {
+            const response = await axios.post(`${urlApi}/chat-api/${conversationId}/mark-as-read`, null, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
 
-        socket.emit('markAsRead', { conversationId }, (response) => {
-            if (response.success) {
+            if (response.data.success) {
                 console.log('Conversación marcada como leída:', response.data);
 
-                // Actualizar el contador de no leídos en la lista de conversaciones
-                setConversations(prev => prev.map(conv =>
-                    conv._id === conversationId ? { ...conv, unreadCount: 0 } : conv
-                ));
+                // Actualizar el estado de las conversaciones
+                setConversations(prev => prev.map(conv => {
+                    if (conv._id === conversationId) {
+                        // Crear una copia actualizada de la conversación
+                        const updatedConversation = { ...conv };
+
+                        // Actualizar el contador de no leídos para el usuario actual
+                        updatedConversation.unreadCounts = (updatedConversation.unreadCounts || []).map(uc =>
+                            uc.userId === user._id ? { ...uc, count: 0 } : uc
+                        );
+
+                        return updatedConversation;
+                    }
+                    return conv;
+                }));
             } else {
-                console.error('Error al marcar como leído:', response.message);
+                console.error('Error al marcar como leído:', response.data.message);
             }
-        });
-    }, [socket]);
-
-    // MARK: updateConversations
-    // Función auxiliar para actualizar la lista de conversaciones con el último mensaje
-    const updateConversations = useCallback((message) => {
-        if (!message || !message.conversation) return;
-
-        setConversations(prev => {
-            // Buscar la conversación a actualizar
-            const index = prev.findIndex(c => c._id === message.conversation);
-
-            if (index === -1) return prev; // No encontrada
-
-            // Crear copia de la lista de conversaciones
-            const updated = [...prev];
-
-            // Actualizar la conversación encontrada
-            updated[index] = {
-                ...updated[index],
-                lastMessage: message,
-                updatedAt: message.createdAt,
-                // Incrementar contador de no leídos si el mensaje es entrante
-                unreadCount: message.sender !== user._id ?
-                    (updated[index].unreadCount || 0) + 1 :
-                    updated[index].unreadCount || 0
-            };
-
-            // Mover la conversación actualizada al inicio
-            return [
-                updated[index],
-                ...updated.slice(0, index),
-                ...updated.slice(index + 1)
-            ];
-        });
-    }, [user?._id]);
-
-    // MARK: addMessage
-    // Función para añadir un mensaje recibido al estado actual
-    const addMessage = useCallback((message) => {
-        if (!message) return;
-
-        // Si el mensaje pertenece a la conversación actual, añadirlo a los mensajes
-        if (currentChat?.activeConversationId === message.conversation) {
-            setMessages(prev => {
-                // Evitar duplicados
-                if (prev.some(m => m._id === message._id)) return prev;
-                return [...prev, message];
-            });
-
-            // Si el mensaje es entrante, marcarlo como leído
-            if (message.sender !== user._id) {
-                markConversationAsRead(message.conversation);
-            }
+        } catch (error) {
+            console.error('Error al marcar como leído:', error);
         }
-
-        // Si es un mensaje de IA para la conversación actual
-        if (isAIChatActive && message.aiConversation === aiConversationId) {
-            setMessages(prev => {
-                if (prev.some(m => m._id === message._id)) return prev;
-                return [...prev, message];
-            });
-        }
-    }, [currentChat?.activeConversationId, isAIChatActive, aiConversationId, user?._id, markConversationAsRead]);
+    }, [token, urlApi, user?._id, setConversations]);
 
     // MARK: requestNotificationPermission
     // Solicitar permisos de notificaciones
@@ -338,8 +299,6 @@ export const useChatActions = (
         sendMessageToUser,
         sendMessageToIA,
         markConversationAsRead,
-        updateConversations,
-        addMessage,
         requestNotificationPermission
     };
 };

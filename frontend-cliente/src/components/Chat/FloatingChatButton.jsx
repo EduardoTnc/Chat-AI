@@ -8,17 +8,17 @@ import './FloatingChatButton.css';
 
 const FloatingChatButton = () => {
   const { isAuthenticated } = useAuth();
-  const { 
-    conversations, 
-    selectAIChat, 
-    isAIChatActive, 
+  const {
+    conversations,
+    selectAIChat,
+    isAIChatActive,
     currentChat,
-    handleTypingEvent 
+    handleTypingEvent
   } = useContext(ChatContext);
 
   const [isOpen, setIsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  
+
   // Efecto para limpiar el estado de typing cuando se cierra el chat
   useEffect(() => {
     return () => {
@@ -37,6 +37,24 @@ const FloatingChatButton = () => {
     }
   }, [conversations]);
 
+  const toggleChat = () => {
+
+
+    // Antes de abrir el chat, deshabilitar el scroll del body
+    if (!isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
+    // Si se está cerrando el chat, detener el typing
+    if (isOpen && currentChat && !isAIChatActive) {
+      handleTypingEvent(false);
+    }
+
+    setIsOpen(!isOpen);
+  };
+
   // No mostrar el botón si el usuario no está logeado
   if (!isAuthenticated) {
     return null;
@@ -48,11 +66,7 @@ const FloatingChatButton = () => {
       <button
         className={`floating-chat-button ${isOpen ? 'open' : ''}`}
         onClick={() => {
-          // Si se está cerrando el chat, detener el typing
-          if (isOpen && currentChat && !isAIChatActive) {
-            handleTypingEvent(false);
-          }
-          setIsOpen(!isOpen);
+          toggleChat();
         }}
         aria-label="Chat"
       >
@@ -78,7 +92,7 @@ const FloatingChatButton = () => {
           className="floating-ai-button"
           onClick={() => {
             selectAIChat();
-            setIsOpen(true);
+            toggleChat();
           }}
           aria-label="Asistente IA"
           title="Hablar con el asistente IA"
@@ -104,15 +118,11 @@ const FloatingChatButton = () => {
 
       {/* Overlay para cerrar el chat al hacer clic fuera de él */}
       {isOpen && (
-        <div 
-          className="chat-overlay" 
+        <div
+          className="chat-overlay"
           onClick={() => {
-            // Detener el typing antes de cerrar
-            if (currentChat && !isAIChatActive) {
-              handleTypingEvent(false);
-            }
-            setIsOpen(false);
-          }} 
+            toggleChat();
+          }}
         />
       )}
     </>

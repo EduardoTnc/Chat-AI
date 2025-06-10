@@ -76,7 +76,7 @@
   justify-content: space-between;
 }
 
-.last-message, .typing-indicator {
+.last-message, .typing-indicator-item {
   margin: 0;
   font-size: 14px;
   color: #666;
@@ -86,7 +86,7 @@
   max-width: 80%;
 }
 
-.typing-indicator {
+.typing-indicator-item {
   color: #2196F3;
   font-style: italic;
 }

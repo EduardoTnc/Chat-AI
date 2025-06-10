@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 
 export const useChatSocket = (
@@ -7,14 +7,22 @@ export const useChatSocket = (
     user,
     socket,
     setSocket,
+    conversations, // This prop is used to initialize conversationsRef
     setConversations,
+    currentChat, // This prop is used to initialize currentChatRef
     setCurrentChat,
     setMessages,
     setOnlineUsers,
     setTypingUsers,
     setIsAIChatActive,
     setAiConversationId,
+    markConversationAsRead
 ) => {
+    const currentChatRef = useRef(currentChat);
+
+    useEffect(() => {
+        currentChatRef.current = currentChat;
+    }, [currentChat]);
 
     // Establecer conexión Socket.IO
     useEffect(() => {
@@ -82,7 +90,7 @@ export const useChatSocket = (
     }, [token, user?._id]);
 
     // Configuración de listeners de socket
-    const setupSocketListeners = useCallback(async (socket) => {
+    const setupSocketListeners = useCallback((socket) => {
         if (!socket) return;
 
         socket.on('connected', (data) => {
@@ -92,13 +100,41 @@ export const useChatSocket = (
         // Escuchar nuevos mensajes
         socket.on('newMessage', (message) => {
             console.log('Mensaje recibido vía socket:', message);
-            setMessages(prevMessages => {
-                // Evitar duplicados si el mensaje ya existe (por ID)
-                if (prevMessages.find(m => m._id === message._id)) {
-                    return prevMessages;
-                }
-                return [...prevMessages, message];
-            });
+            const finalCurrentChat = currentChatRef.current; // Use the ref to get the latest currentChat
+
+            // Actualizar la lista de mensajes si es la conversación actual
+            if (message.conversationId === finalCurrentChat?.activeConversationId) {
+                setMessages(prevMessages => {
+                    // Evitar duplicados si el mensaje ya existe (por ID)
+                    if (prevMessages.find(m => m._id === message._id)) {
+                        return prevMessages;
+                    }
+                    return [...prevMessages, message];
+                });
+            }
+
+            // Actualizar el lastMessage de la conversación
+            setConversations(prev => prev.map(conv =>
+                conv._id === message.conversationId ? { ...conv, lastMessage: message } : conv
+            ));
+
+            // Marcar conversación como leída si el mensaje es del usuario actual
+            const finalCurrentChatForRead = currentChatRef.current; // Use the ref again
+            if (message.conversationId === finalCurrentChatForRead?.activeConversationId) {
+                console.log('Marcando conversación como leída', message.conversationId);
+                markConversationAsRead(message.conversationId);
+            }
+
+            // Si el mensaje es de otro usuario no actual, incrementar el contador de mensajes no leídos
+            if (message.conversationId !== finalCurrentChat?.activeConversationId) {
+                console.log('Incrementando contador de mensajes no leídos', message.conversationId);
+                setConversations(prev => prev.map(conv =>
+                    conv._id === message.conversationId ? {
+                        ...conv,
+                        unreadCounts: conv.unreadCounts.map(uc => uc.userId === user._id ? { ...uc, count: uc.count + 1 } : uc)
+                    } : conv
+                ));
+            }
         });
 
         // Escuchar eventos de usuarios en línea
@@ -153,7 +189,7 @@ export const useChatSocket = (
             socket.off('messageRead');
             socket.off('newConversation');
         };
-    }, [setMessages, setOnlineUsers, setTypingUsers, setConversations]);
+    }, [setMessages, setOnlineUsers, setTypingUsers, setConversations, markConversationAsRead, setCurrentChat, setIsAIChatActive, setAiConversationId]); // Removed currentChat and conversations
 
     // Función para enviar eventos de typing
     const handleTypingEvent = useCallback((isTypingValue, currentChatValue, isAIChatActiveValue) => {
