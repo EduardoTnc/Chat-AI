@@ -7,7 +7,8 @@ import chalk from 'chalk'; // Para logs coloridos
 // Importar modelos
 import AIModelConfig from '../models/AIModelConfig.js';
 import ApiKeyStore from '../models/ApiKeyStore.js';
-import Message from '../models/Message.js'; // Por si necesitas crear un admin/agent para pruebas
+import Message from '../models/Message.js';
+import User from '../models/User.js';
 
 const connectDBForSeed = async () => {
     try {
@@ -25,7 +26,37 @@ const connectDBForSeed = async () => {
     }
 };
 
-const seedData = async () => {
+const seedAdminUser = async () => {
+    try {
+        await connectDBForSeed();
+
+        // --- Crear Usuario Administrador Principal ---
+        const adminEmail = 'admin@gmail.com';
+        const adminPassword = 'admin22334455'; // Contraseña en texto plano para el seeder
+
+        let adminUser = await User.findOne({ email: adminEmail });
+        if (!adminUser) {
+            console.log(chalk.yellow(`Creando usuario administrador: ${adminEmail}...`));
+            // El pre-save hook del modelo User hasheará la contraseña
+            adminUser = await User.create({
+                name: 'Admin Principal',
+                email: adminEmail,
+                passwordHash: adminPassword, // Se hasheará automáticamente
+                role: 'admin',
+            });
+            console.log(chalk.green('Usuario administrador creado con éxito.'));
+        } else {
+            console.log(chalk.blue(`Usuario administrador ${adminEmail} ya existe.`));
+        }
+    } catch (error) {
+        console.error(chalk.red('Error durante el sembrado de datos:'), error);
+    } finally {
+        await mongoose.disconnect();
+        console.log(chalk.yellow('MongoDB desconectado del seeder.'));
+    }
+};
+
+const seedAiModelsConfigs = async () => {
     try {
         await connectDBForSeed();
 
@@ -33,8 +64,7 @@ const seedData = async () => {
         console.log(chalk.yellow('Limpiando colecciones AIModelConfig, ApiKeyStore y Message...'));
         await AIModelConfig.deleteMany({});
         await ApiKeyStore.deleteMany({});
-        await Message.deleteMany({});
-        // No limpies User a menos que quieras recrearlos siempre.
+        // await Message.deleteMany({});
 
         // --- Crear Configuraciones de Modelos de IA ---
         const aiModelConfigsToSeed = [
@@ -146,4 +176,6 @@ const seedData = async () => {
     }
 };
 
-seedData();
+// seedAiModelsConfigs();
+seedAdminUser();
+

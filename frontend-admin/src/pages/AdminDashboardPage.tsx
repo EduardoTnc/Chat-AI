@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
-import UserTable from '../components/admin/UserTable';
+import UserTable from '../components/admin/user/UserTable';
 import { useAdminStore } from '../store/adminStore';
 import { getUsers } from '../api/userService';
-import CreateUserDialog from '../components/admin/CreateUserDialog';
+import CreateUserDialog from '../components/admin/user/CreateUserDialog';
 
 const AdminDashboardPage = () => {
     const { user, logout } = useAuth();
