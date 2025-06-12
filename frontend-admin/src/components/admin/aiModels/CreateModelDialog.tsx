@@ -41,7 +41,7 @@ const CreateModelDialog = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Nueva</Button>
+        <Button>Nuevo Modelo</Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>

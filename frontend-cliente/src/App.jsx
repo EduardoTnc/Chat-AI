@@ -13,18 +13,29 @@ import FloatingChatButton from './components/Chat/FloatingChatButton'
 
 const App = () => {
 
-  const [mostrarLogin, setMostrarLogin] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+
+  const handleLoginClick = () => {
+    setShowLogin(true);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLogin(false);
+  };
 
   return (
     <div className='min-h-[100dvh]'>
+      <LoginPopup 
+        isOpen={showLogin} 
+        onClose={() => setShowLogin(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
 
-      {mostrarLogin && <LoginPopup setMostrarLogin={setMostrarLogin} />}
-
-      <Navbar setMostrarLogin={setMostrarLogin} />
+      <Navbar onLoginClick={handleLoginClick} />
       <div className="w-[92%] md:w-[90%] lg:w-[80%] m-auto">
         <Routes>
           <Route path="/" element={<Inicio />} />
-          <Route path="/carrito" element={<Carrito />} />
+          <Route path="/cart" element={<Carrito />} />
           <Route path="/tomar-orden" element={<TomarOrden />} />
           <Route path="/orden-recibida/:orderId" element={<OrdenRecibida />} />
           <Route path="/mis-ordenes" element={<MisOrdenes />} />

@@ -3,7 +3,7 @@ import { assets } from '../../assets/assets'; // Ajusta la ruta a tus assets
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
-const LoginPopup = ({ setMostrarLogin }) => {
+const LoginPopup = ({ isOpen = false, onClose, onLoginSuccess }) => {
   const { login, urlApi } = useAuth();
   const [currState, setCurrState] = useState("Iniciar Sesión");
   const [data, setData] = useState({
@@ -35,7 +35,8 @@ const LoginPopup = ({ setMostrarLogin }) => {
       if (currState === "Iniciar Sesión") {
         const loginResult = await login(payload.email, payload.password);
         if (loginResult.success) {
-          setMostrarLogin(false);
+          if (onLoginSuccess) onLoginSuccess();
+          if (onClose) onClose();
         } else {
           setError(loginResult.error || "Ocurrió un error al iniciar sesión.");
         }
@@ -44,7 +45,8 @@ const LoginPopup = ({ setMostrarLogin }) => {
         if (response.data.success) {
           const loginResult = await login(payload.email, payload.password);
           if (loginResult.success) {
-            setMostrarLogin(false);
+            if (onLoginSuccess) onLoginSuccess();
+            if (onClose) onClose();
           } else {
             setError(loginResult.error || "Ocurrió un error al iniciar sesión.");
           }
@@ -58,12 +60,37 @@ const LoginPopup = ({ setMostrarLogin }) => {
     }
   };
 
+  // Don't render anything if not open
+  if (!isOpen) return null;
+
+  // Handle click outside to close
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose?.();
+    }
+  };
+
   return (
-    <div className='fixed top-0 left-0 right-0 bottom-0 bg-black/50 flex items-center justify-center z-[100]'> {/* Aumentar z-index */}
-      <form onSubmit={handleLoginRegister} className='w-[90%] md:w-[50%] lg:w-[30%] bg-white p-6 rounded-lg shadow-xl animate-fade-in-up'>
+    <div 
+      className='fixed top-0 left-0 right-0 bottom-0 bg-black/50 flex items-center justify-center z-[100]'
+      onClick={handleBackdropClick}
+    >
+      <form 
+        onSubmit={handleLoginRegister} 
+        className='w-[90%] md:w-[50%] lg:w-[30%] bg-white p-6 rounded-lg shadow-xl animate-fade-in-up'
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className='flex justify-between items-center mb-6'>
           <h2 className='text-2xl font-bold text-gray-800'>{currState}</h2>
-          <img onClick={() => setMostrarLogin(false)} src={assets.cross_icon} alt="Cerrar" className='cursor-pointer w-5 hover:opacity-70 transition-opacity' />
+          <img 
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose?.();
+            }} 
+            src={assets.cross_icon} 
+            alt="Cerrar" 
+            className='cursor-pointer w-5 hover:opacity-70 transition-opacity' 
+          />
         </div>
 
 

@@ -75,7 +75,7 @@ const listOrdersAdmin = async (req, res) => {
 const updateOrderStatus = async (req, res) => {
     try {
         const order = await orderModel.findByIdAndUpdate(req.body.orderId, { status: req.body.status })
-        res.json({ success: true, message: "Estado de la orden actualizado" })
+        res.json({ success: true, message: "Estado de la orden actualizado", order })
     } catch (error) {
         console.log(error)
         res.json({ success: false, message: "Error al actualizar el estado de la orden" })

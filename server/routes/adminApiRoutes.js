@@ -26,7 +26,9 @@ import {
     getAllUsers,
     createUserByAdmin,
     updateUserByAdmin,
-    deleteUserByAdmin
+    deleteUserByAdmin,
+    restoreUser,
+    getDeletedUsers
 } from '../controllers/userController.js';
 
 const router = express.Router();
@@ -65,8 +67,10 @@ router.get('/escalated-chats', authorize('admin', 'agent'), getEscalatedChatsCtr
 
 //? Rutas para gestión de Usuarios (Admin)
 router.get('/users', authorize('admin'), getAllUsers);
+router.get('/users/deleted', authorize('admin'), getDeletedUsers);
 router.post('/users', authorize('admin'), createUserByAdmin);
 router.put('/users/:userId', authorize('admin'), updateUserByAdmin);
 router.delete('/users/:userId', authorize('admin'), deleteUserByAdmin);
+router.put('/users/restore/:userId', authorize('admin'), restoreUser);
 
 export default router;

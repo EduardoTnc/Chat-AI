@@ -9,7 +9,7 @@ const ConversationQueue = () => {
     return (
         <Card className="h-full">
             <CardHeader>
-                <CardTitle>Conversation Queue</CardTitle>
+                <CardTitle>Cola de Conversaciones</CardTitle>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="h-[calc(100vh-12rem)]">

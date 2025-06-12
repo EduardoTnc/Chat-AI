@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import ConversationsSidebar from '@/components/admin/chat/ConversationsSidebar';
 import ChatWindow from '@/components/admin/chat/ChatWindow';
 
+
 const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:5001', {
   withCredentials: true,
   transports: ['websocket'],

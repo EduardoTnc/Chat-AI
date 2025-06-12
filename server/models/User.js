@@ -54,12 +54,34 @@ userSchema.pre('save', async function (next) {
 });
 
 // Hook pre-find para filtrar automáticamente los borrados lógicamente
+// Método para eliminación lógica
+userSchema.methods.softDelete = async function() {
+  this.isDeleted = true;
+  this.deletedAt = new Date();
+  return this.save();
+};
+
+// Método estático para encontrar usuarios eliminados
+userSchema.statics.findDeleted = function() {
+  return this.find({ isDeleted: true });
+};
+
+// Método estático para restaurar usuarios
+export const restoreUser = async (id) => {
+  return this.findByIdAndUpdate(
+    id,
+    { $set: { isDeleted: false }, $unset: { deletedAt: 1 } },
+    { new: true, runValidators: true }
+  ).setOptions({ withDeleted: true });
+};
+
+// Hook para filtrar usuarios eliminados en las consultas
 userSchema.pre(/^find/, function(next) {
-    // Si la query no especifica lo contrario, solo mostrar los no borrados
-    if (this.getOptions().withDeleted !== true) {
-        this.where({ isDeleted: { $ne: true } });
-    }
-    next();
+  // Si la query no especifica lo contrario, solo mostrar los no borrados
+  if (this.getOptions().withDeleted !== true) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+  next();
 });
 
 /**

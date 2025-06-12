@@ -279,8 +279,31 @@ class AIService {
 						//? Si el tool es 'escalate_to_human_agent', ejecutar handleEscalationTool
 						if (toolCall.function.name === "escalate_to_human_agent") {
 							const args = toolCall.function.arguments;
-							//MARK: escalar
 							toolResultContent = await this.handleEscalationTool(requestingUser, conversationId, args);
+						}
+						//? Si el tool es 'search_menu_items', ejecutar _searchMenuItems
+						else if (toolCall.function.name === "search_menu_items") {
+							const args = typeof toolCall.function.arguments === 'string' 
+								? JSON.parse(toolCall.function.arguments) 
+								: toolCall.function.arguments;
+							
+							const searchResult = await this._searchMenuItems(args);
+							
+							if (searchResult.success) {
+								toolResultContent = JSON.stringify({
+									success: true,
+									items: searchResult.data,
+									message: searchResult.message
+								});
+							} else {
+								toolResultContent = JSON.stringify({
+									success: false,
+									error: searchResult.error,
+									details: searchResult.details || 'Error desconocido al buscar ítems del menú.',
+									message: 'No se pudieron cargar los ítems del menú.'
+								});
+								isError = true;
+							}
 						}
 						// ... else if (toolCall.function.name === "otra_tool") ...
 						else {
@@ -377,11 +400,49 @@ class AIService {
 		return `He escalado tu solicitud a un agente humano con urgencia ${args.urgency}. Un agente se pondrá en contacto contigo lo antes posible.`; // Contenido para el 'toolResult'
 	}
 
+	async _searchMenuItems({ query }) {
+		try {
+			// Aquí implementarías la lógica para buscar ítems del menú
+			// Por ejemplo, usando un servicio de menú o consultando la base de datos
+			const menuItems = await this.messageService.searchMenuItems(query);
+			
+			return {
+				success: true,
+				data: menuItems,
+				message: 'Ítems del menú encontrados'
+			};
+		} catch (error) {
+			console.error('Error al buscar ítems del menú:', error);
+			return {
+				success: false,
+				error: 'No se pudieron cargar los ítems del menú',
+				details: error.message
+			};
+		}
+	}
+
 	_getToolDefinitions(providerName) {
 		const commonTools = [
 			{
-				type: "function", // OpenAI espera esto a este nivel
-				function: { // OpenAI espera el objeto function aquí
+				type: "function",
+				function: {
+					name: "search_menu_items",
+					description: "Busca ítems del menú por nombre, descripción o ingredientes. Úsalo cuando el usuario pregunte por platos, comidas o bebidas disponibles.",
+					parameters: {
+						type: "object",
+						properties: {
+							query: {
+								type: "string",
+								description: "Términos de búsqueda para encontrar ítems del menú (nombres, ingredientes, tipos de comida, etc.)"
+							}
+						},
+						required: ["query"]
+					}
+				}
+			},
+			{
+				type: "function",
+				function: {
 					name: "escalate_to_human_agent",
 					description: "Escala la conversación actual a un agente humano cuando el usuario lo solicita explícitamente o cuando el asistente de IA no puede resolver la consulta después de varios intentos o si el tema es muy sensible o complejo.",
 					parameters: {
@@ -398,8 +459,8 @@ class AIService {
 								default: "medium"
 							}
 						},
-						required: ["reason"],
-					},
+						required: ["reason"]
+					}
 				}
 			}
 		];

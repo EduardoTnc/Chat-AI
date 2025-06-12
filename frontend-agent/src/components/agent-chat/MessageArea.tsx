@@ -8,34 +8,55 @@ const MessageArea = () => {
     // Placeholder data
     const { currentConversationId } = useAgentStore();
     const messages = [
-        { id: '1', sender: 'customer', text: 'Hello, I need help with my order.' },
-        { id: '2', sender: 'agent', text: 'Hello! I can help with that. What is your order number?' },
+        { id: '1', sender: 'customer', text: 'Hola, necesito ayuda con mi orden.' },
+        { id: '2', sender: 'agent', text: 'Hola, ¿con qué orden necesitas ayuda?' },
     ];
 
     return (
         <Card className="h-full flex flex-col">
-            <CardHeader>
-                <CardTitle>Chat with {currentConversationId}</CardTitle>
+            <CardHeader className="pb-2">
+                <CardTitle>Chat con {currentConversationId}</CardTitle>
             </CardHeader>
-            <CardContent className="flex-grow">
-                <ScrollArea className="h-[calc(100vh-18rem)]">
-                    <div className="space-y-4">
-                        {messages.map((msg) => (
-                            <div key={msg.id} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-3 rounded-lg max-w-xs ${msg.sender === 'agent' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                                    <p>{msg.text}</p>
+            <CardContent className="flex-1 min-h-0 overflow-hidden">
+                <div className="h-full flex flex-col">
+                    <div className="flex-1 overflow-auto">
+                        <div className="space-y-4">
+                            {messages.map((msg) => (
+                                <div key={msg.id} className={`flex ${msg.sender === 'agent' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`p-3 rounded-lg max-w-xs ${msg.sender === 'agent' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                                        <p>{msg.text}</p>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
-                </ScrollArea>
-            </CardContent>
-            <CardFooter>
-                <div className="w-full flex items-center space-x-2">
-                    <Textarea placeholder="Type your message..." className="flex-grow" />
-                    <Button>Send</Button>
+                    <div className="pt-4 mt-auto">
+                        <div className="relative w-full flex items-end space-x-2">
+                            <Textarea
+                                placeholder="Escribe tu mensaje..."
+                                className="flex-grow min-h-[40px] max-h-96 overflow-y-auto resize-none"
+                                rows={1}
+                                style={{
+                                    height: 'auto',
+                                    maxHeight: '384px',
+                                    scrollbarWidth: 'thin',
+                                    scrollbarGutter: 'stable',
+                                    resize: 'none',
+                                    overflowY: 'auto',
+                                    overflowX: 'hidden',
+                                    scrollbarColor: 'transparent',
+                                }}
+                                onInput={(e) => {
+                                    const target = e.target as HTMLTextAreaElement;
+                                    target.style.height = 'auto';
+                                    target.style.height = `${Math.min(target.scrollHeight, 384)}px`;
+                                }}
+                            />
+                            <Button className="h-10">Enviar</Button>
+                        </div>
+                    </div>
                 </div>
-            </CardFooter>
+            </CardContent>
         </Card>
     );
 };

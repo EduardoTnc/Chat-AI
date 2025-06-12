@@ -1,22 +1,25 @@
 import { useEffect } from 'react';
-import { listOrdersAdmin } from '@/api/orderService';
 import { useOrderStore } from '@/store/orderStore';
 import OrdersTable from '@/components/admin/orders/OrdersTable';
+import { PageHeader } from '@/components/admin/layout/PageHeader';
 
 const OrdersPage = () => {
-  const { setOrders } = useOrderStore();
+  const { fetchOrders } = useOrderStore();
 
   useEffect(() => {
-    (async () => {
-      const orders = await listOrdersAdmin();
-      setOrders(orders);
-    })();
-  }, [setOrders]);
+    fetchOrders();
+  }, [fetchOrders]);
 
   return (
-    <div>
-      <h2 className="text-2xl font-semibold mb-4">Órdenes</h2>
-      <OrdersTable />
+    <div className="h-screen w-full flex flex-col">
+      <main className="flex-grow p-4">
+        <PageHeader 
+          title="Órdenes" 
+          description="Administra las órdenes de los clientes"
+        >
+        </PageHeader>
+        <OrdersTable />
+      </main>
     </div>
   );
 };

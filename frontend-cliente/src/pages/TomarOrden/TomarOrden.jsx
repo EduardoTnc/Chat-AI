@@ -48,7 +48,7 @@ const TomarOrden = () => {
         paymentMethod: "Cash on Delivery",
       }
       console.log(orderData)
-      const response = await axios.post(`${urlApi}/api/order/place`, orderData, { headers: { token } })
+      const response = await axios.post(`${urlApi}/order/place`, orderData, { headers: { token } })
       console.log(response)
       if (response.data.success) {
         const {session_url} = response.data;

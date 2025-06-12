@@ -9,18 +9,19 @@ const ConversationDetails = () => {
         customerName: 'John Doe',
         email: 'john.doe@example.com',
         orderId: 'ORD-12345',
-        status: 'Active',
+        status: 'En Escalada',
+        escalationReason: 'El cliente necesita ayuda con un problema técnico',
     };
 
     return (
         <Card className="h-full">
             <CardHeader>
-                <CardTitle>Conversation Details {currentConversationId}</CardTitle>
+                <CardTitle>Detalles de la Conversación {currentConversationId}</CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="space-y-3">
                     <div>
-                        <p className="font-semibold">Customer</p>
+                        <p className="font-semibold">Nombre del Cliente</p>
                         <p className="text-sm text-gray-500">{details.customerName}</p>
                     </div>
                     <div>
@@ -28,12 +29,16 @@ const ConversationDetails = () => {
                         <p className="text-sm text-gray-500">{details.email}</p>
                     </div>
                     <div>
-                        <p className="font-semibold">Order ID</p>
+                        <p className="font-semibold">ID de la Orden</p>
                         <p className="text-sm text-gray-500">{details.orderId}</p>
                     </div>
                     <div>
-                        <p className="font-semibold">Status</p>
+                        <p className="font-semibold">Estado</p>
                         <p className="text-sm text-gray-500">{details.status}</p>
+                    </div>
+                    <div>
+                        <p className="font-semibold">Motivo de la Escalada</p>
+                        <p className="text-sm text-gray-500">{details.escalationReason}</p>
                     </div>
                 </div>
             </CardContent>

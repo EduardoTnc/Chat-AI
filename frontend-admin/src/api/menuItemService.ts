@@ -12,7 +12,9 @@ export interface MenuItemPayload {
 }
 
 export const listMenuItems = async () => {
-  const response = await axios.get(`${API_BASE_URL}${PREFIX}/list`);
+  const response = await axios.get(`${API_BASE_URL}${PREFIX}/list-all`, {
+    withCredentials: true,
+  });
   return response.data.menuItems;
 };
 
@@ -28,7 +30,7 @@ export const addMenuItem = async (data: MenuItemPayload) => {
     headers: { 'Content-Type': 'multipart/form-data' },
     withCredentials: true,
   });
-  return response.data.data;
+  return response.data.menuItem;
 };
 
 export const updateMenuItem = async (id: string, data: Partial<MenuItemPayload>) => {
@@ -43,12 +45,37 @@ export const updateMenuItem = async (id: string, data: Partial<MenuItemPayload>)
     headers: { 'Content-Type': 'multipart/form-data' },
     withCredentials: true,
   });
-  return response.data.data;
+  return response.data.updatedItem;
+};
+
+export const getUniqueCategories = async (): Promise<string[]> => {
+  try {
+    const response = await axios.get(`${API_BASE_URL}${PREFIX}/categories`, {
+      withCredentials: true,
+    });
+    return response.data.categories || [];
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return [];
+  }
 };
 
 export const deleteMenuItem = async (id: string) => {
   const response = await axios.delete(`${API_BASE_URL}${PREFIX}/remove/${id}`, {
     withCredentials: true,
   });
-  return response.data.data;
+  return response.data;
+};
+
+export const restoreMenuItem = async (id: string) => {
+  try {
+    const response = await axios.put(
+      `${API_BASE_URL}${PREFIX}/restore/${id}`,
+      { withCredentials: true }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error al restaurar el ítem:', error);
+    throw new Error(error.response?.data?.message || 'Error al restaurar el ítem');
+  }
 };

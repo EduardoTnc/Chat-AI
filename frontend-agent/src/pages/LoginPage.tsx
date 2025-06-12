@@ -30,8 +30,8 @@ const LoginPage = () => {
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Agent & Admin Login</CardTitle>
-                    <CardDescription>Enter your credentials to access the dashboard.</CardDescription>
+                    <CardTitle className="text-2xl">Chat Agent Panel</CardTitle>
+                    <CardDescription>Ingrese sus credenciales para acceder al panel del agente de chat.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">

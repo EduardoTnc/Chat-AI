@@ -30,8 +30,8 @@ const LoginPage = () => {
         <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-950">
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <CardTitle className="text-2xl">Admin Login</CardTitle>
-                    <CardDescription>Enter your credentials to access the admin dashboard.</CardDescription>
+                    <CardTitle className="text-2xl">Iniciar Sesión (Panel Admin)</CardTitle>
+                    <CardDescription>Ingrese sus credenciales para acceder al panel de administración.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <form onSubmit={handleSubmit} className="space-y-4">
@@ -57,7 +57,7 @@ const LoginPage = () => {
                         </div>
                         {error && <p className="text-red-500 text-sm">{error}</p>}
                         <Button type="submit" className="w-full" disabled={loading}>
-                            {loading ? 'Logging in...' : 'Login'}
+                            {loading ? 'Iniciando Sesión...' : 'Iniciar Sesión'}
                         </Button>
                     </form>
                 </CardContent>

@@ -33,11 +33,11 @@ const CreateApiKeyDialog = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>Nueva</Button>
+        <Button>Nuevo API Key</Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nueva API Key</DialogTitle>
+          <DialogTitle>Nuevo API Key</DialogTitle>
         </DialogHeader>
         <form className="space-y-3" onSubmit={handleSubmit}>
           <Input placeholder="Proveedor" value={form.provider} onChange={(e) => handleChange('provider', e.target.value)} required />

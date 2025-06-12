@@ -3,6 +3,7 @@ import { useAIModelStore } from '@/store/aiModelStore';
 import { listAIModels } from '@/api/aiModelService';
 import AIModelsTable from '@/components/admin/aiModels/AIModelsTable';
 import CreateModelDialog from '@/components/admin/aiModels/CreateModelDialog';
+import { PageHeader } from '@/components/admin/layout/PageHeader';
 
 const AIModelsPage = () => {
   const { setModels } = useAIModelStore();
@@ -15,12 +16,16 @@ const AIModelsPage = () => {
   }, [setModels]);
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-2xl font-semibold">Modelos de IA</h2>
-        <CreateModelDialog />
-      </div>
-      <AIModelsTable />
+    <div className="h-screen w-full flex flex-col">
+      <main className="flex-grow p-4">
+        <PageHeader 
+          title="Modelos de IA" 
+          description="Administra los modelos de IA"
+        >
+          <CreateModelDialog />
+        </PageHeader>
+        <AIModelsTable />
+      </main>
     </div>
   );
 };

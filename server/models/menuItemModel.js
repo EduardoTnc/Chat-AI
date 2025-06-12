@@ -12,6 +12,7 @@ const menuItemSchema = new mongoose.Schema({
 
 // Hook pre-find para soft delete
 menuItemSchema.pre(/^find/, function(next) {
+  // Solo aplicar el filtro si withDeleted no es true
   if (this.getOptions().withDeleted !== true) {
     this.where({ isDeleted: { $ne: true } });
   }
