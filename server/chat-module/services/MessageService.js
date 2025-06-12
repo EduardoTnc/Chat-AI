@@ -100,12 +100,13 @@ class MessageService {
      * El usuario que realiza la petición debe tener acceso a la conversación.
      * @param {string} conversationId - ID de la conversación.
      * @param {{ _id: string, role: string }} requestingUser - Información del usuario que realiza la petición.
-     * @param {{ limit: number, beforeTimestamp: number }} [options] - Opciones para la consulta.
+     * @param {Object} [options] - Opciones para la consulta.
      * @param {number} [options.limit=20] - Límite de mensajes a obtener.
      * @param {number} [options.beforeTimestamp=null] - Timestamp antes del cual obtener los mensajes.
      * @returns {Promise<Message[]>} - Arreglo de mensajes.
      */
-    async getMessagesByConversationId(conversationId, requestingUser, { limit = 20, beforeTimestamp = null }) {
+    async getMessagesByConversationId(conversationId, requestingUser, options = {}) {
+        const { limit = 20, beforeTimestamp = null } = options;
         //! Verificar si el usuario puede acceder a esta conversación 
         await this._validateConversationAccess(conversationId, requestingUser._id, requestingUser.role);
 

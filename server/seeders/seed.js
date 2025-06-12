@@ -176,6 +176,6 @@ const seedAiModelsConfigs = async () => {
     }
 };
 
-// seedAiModelsConfigs();
-seedAdminUser();
+seedAiModelsConfigs();
+// seedAdminUser();
 

@@ -78,6 +78,9 @@ const ChatContextProvider = ({ children }) => {
         setTypingUsers,
         setIsAIChatActive,
         setAiConversationId,
+        setIsAISending,
+        isAIChatActive,
+        aiConversationId,
         markConversationAsRead
     );
 

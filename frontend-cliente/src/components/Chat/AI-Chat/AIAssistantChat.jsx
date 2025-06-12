@@ -123,11 +123,10 @@ const AIAssistantChat = () => {
             {/* ... (sugerencias como antes) ... */}
           </div>
         ) : (
-          messages.map(message => (
+          messages.map((message, idx) => (
             <MessageItem
-              key={message._id} // Usar _id real o tempId
+              key={message._id || message.tempId || idx}
               message={message}
-              // Mensajes del usuario son 'own', los de 'IA', 'tool', 'systemNotification' no lo son
               isOwn={message.senderId?._id === currentUser?._id && message.senderType === 'user'}
             />
           ))

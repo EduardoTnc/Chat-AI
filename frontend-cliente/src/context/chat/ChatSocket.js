@@ -16,13 +16,26 @@ export const useChatSocket = (
     setTypingUsers,
     setIsAIChatActive,
     setAiConversationId,
+    setIsAISending,
+    isAIChatActive,
+    aiConversationId,
     markConversationAsRead
 ) => {
     const currentChatRef = useRef(currentChat);
+    const isAIChatActiveRef = useRef(isAIChatActive);
+    const aiConversationIdRef = useRef(aiConversationId);
 
     useEffect(() => {
         currentChatRef.current = currentChat;
     }, [currentChat]);
+
+    useEffect(() => {
+        isAIChatActiveRef.current = isAIChatActive;
+    }, [isAIChatActive]);
+
+    useEffect(() => {
+        aiConversationIdRef.current = aiConversationId;
+    }, [aiConversationId]);
 
     // Establecer conexión Socket.IO
     useEffect(() => {
@@ -148,6 +161,50 @@ export const useChatSocket = (
             setOnlineUsers(prev => prev.filter(id => id !== userId));
         });
 
+        // ------------------ IA EVENTS ------------------
+
+        // Confirmación de mensaje del usuario enviado a IA
+        socket.on('userMessageToIASent', ({ message, tempId }) => {
+            console.log('userMessageToIASent:', { message, tempId });
+            if (isAIChatActiveRef.current) {
+                // Si todavía no tenemos conversationId, establecerlo
+                if (!aiConversationIdRef.current && message.conversationId) {
+                    setAiConversationId(message.conversationId);
+                }
+
+                // Reemplazar mensaje temporal en UI
+                setMessages(prev => prev.map(m =>
+                    m._id === tempId ? { ...message, temporary: false } : m
+                ));
+            }
+            // IA está procesando, mantener isAISending true hasta respuesta final
+        });
+
+        // Respuesta de la IA
+        socket.on('newMessageFromIA', ({ message, conversationId }) => {
+            console.log('newMessageFromIA:', { message, conversationId });
+            if (isAIChatActiveRef.current && conversationId === aiConversationIdRef.current) {
+                setMessages(prev => [...prev, message]);
+            }
+            setIsAISending(false);
+        });
+
+        // Escalación en progreso
+        socket.on('escalationInProgress', ({ conversationId, message }) => {
+            console.log('escalationInProgress:', conversationId);
+            if (isAIChatActiveRef.current && conversationId === aiConversationIdRef.current) {
+                setMessages(prev => [...prev, {
+                    _id: `system_${Date.now()}`,
+                    senderType: 'systemNotification',
+                    content: message || 'Estamos conectándote con un agente...',
+                    createdAt: new Date().toISOString(),
+                    conversationId
+                }]);
+            }
+        });
+
+        // ------------------ USER CHAT EVENTS ------------------
+
         // Escuchar eventos de escritura
         socket.on('userTyping', ({ senderId, conversationId, isTyping }) => {
             console.log(`Usuario ${senderId} ${isTyping ? 'escribiendo' : 'dejó de escribir'} en ${conversationId}`);
@@ -188,8 +245,13 @@ export const useChatSocket = (
             socket.off('userTyping');
             socket.off('messageRead');
             socket.off('newConversation');
+
+            // IA events
+            socket.off('userMessageToIASent');
+            socket.off('newMessageFromIA');
+            socket.off('escalationInProgress');
         };
-    }, [setMessages, setOnlineUsers, setTypingUsers, setConversations, markConversationAsRead, setCurrentChat, setIsAIChatActive, setAiConversationId]); // Removed currentChat and conversations
+    }, [setMessages, setOnlineUsers, setTypingUsers, setConversations, markConversationAsRead, setCurrentChat, setIsAIChatActive, setAiConversationId, setIsAISending]);
 
     // Función para enviar eventos de typing
     const handleTypingEvent = useCallback((isTypingValue, currentChatValue, isAIChatActiveValue) => {

@@ -34,10 +34,14 @@ export const getAIConversationMessages = async (req, res, next) => {
         // Similar al chatController, verificar pertenencia de la conversación al usuario.
         // MessageService.getMessagesByConversationId podría encargarse de esto.
 
-        const messages = await messageService.getMessagesByConversationId(conversationId, {
-            limit: parseInt(limit),
-            beforeTimestamp,
-        });
+        const messages = await messageService.getMessagesByConversationId(
+            conversationId,
+            { _id: userId, role: req.user.role },
+            {
+                limit: parseInt(limit),
+                beforeTimestamp,
+            }
+        );
 
         // Filtrar para asegurar que la conversación es de tipo 'user-to-ia' y pertenece al usuario.
         // Esto es una doble verificación, idealmente el servicio ya lo haría.

@@ -256,7 +256,7 @@ class AIService {
 				type: 'IAResponse',
 				modelId: clientModelId, // El modelId que usó el cliente
 				usage: aiRawResponse.usage,
-				toolCalls: aiRawResponse.toolCalls.map(tc => ({
+				toolCalls: (aiRawResponse.toolCalls || []).map(tc => ({
 					...tc,
 					function: {
 						...tc.function,
@@ -274,17 +274,17 @@ class AIService {
 				const toolResults = [];
 
 				//? 6. Procesar cada tool_call secuencialmente
-				for (const toolCall of aiRawResponse.toolCalls) {
-					try {
-						let toolResultContent;
-						const isError = false;
+				for (let toolCall of aiRawResponse.toolCalls || []) {
+					let toolResultContent;
+					let isError = false;
 
+					try {
 						switch (toolCall.function.name) {
 							case 'search_menu_items':
 								toolResultContent = await this.handleMenuSearch(
 									requestingUser,
-									typeof toolCall.function.arguments === 'string' 
-										? JSON.parse(toolCall.function.arguments) 
+									typeof toolCall.function.arguments === 'string'
+										? JSON.parse(toolCall.function.arguments)
 										: toolCall.function.arguments
 								);
 								break;
@@ -481,13 +481,11 @@ class AIService {
 							},
 							category: {
 								type: "string",
-								description: "Categoría específica para filtrar los resultados (ej. 'platos principales', 'postres', 'bebidas').",
-								required: false
+								description: "Categoría específica para filtrar los resultados (ej. 'platos principales', 'postres', 'bebidas')."
 							},
 							maxPrice: {
 								type: "number",
-								description: "Precio máximo de los ítems a buscar.",
-								required: false
+								description: "Precio máximo de los ítems a buscar."
 							},
 							limit: {
 								type: "integer",

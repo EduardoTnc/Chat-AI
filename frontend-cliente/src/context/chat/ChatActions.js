@@ -164,73 +164,50 @@ export const useChatActions = (
         setMessages(prev => [...prev, userMessage]);
 
         try {
-            // Preparar parámetros para la llamada a la API
-            const modelId = model?._id || selectedAIModel?._id;
-
-            if (!modelId) {
-                throw new Error('No hay modelo de IA seleccionado');
+            // Emitir mediante Socket.IO
+            if (!socket) {
+                throw new Error('Socket no inicializado');
             }
 
-            const endpoint = `${urlApi}/ai-api/chat`;
             const payload = {
-                message: text,
-                modelId,
-                conversationId: aiConversationId // null la primera vez
+                modelId: model?._id || selectedAIModel?._id,
+                content: text,
+                conversationId: aiConversationId, // Puede ser null
+                tempId,
+                clientInfo: { userAgent: navigator.userAgent }
             };
 
-            console.log('Llamando a la API de IA:', endpoint);
-            console.log('Con payload:', payload);
+            console.log('Enviando mensaje a IA vía socket:', payload);
 
-            // Llamar a la API
-            const response = await axios.post(
-                endpoint,
-                payload,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            socket.emit('sendMessageToIA', payload, (ack) => {
+                if (ack?.error) {
+                    console.error('Error ACK al enviar mensaje IA:', ack.error);
 
-            if (response.data.success) {
-                console.log('Respuesta de IA recibida:', response.data);
+                    // Marcar mensaje como fallido
+                    setMessages(prev => prev.map(msg =>
+                        msg._id === tempId ? { ...msg, error: true, temporary: false } : msg
+                    ));
 
-                // Actualizar el mensaje del usuario con el ID real
-                const realUserMessage = response.data.data.userMessage;
-                setMessages(prev => prev.map(msg =>
-                    msg._id === tempId ? { ...realUserMessage, temporary: false } : msg
-                ));
+                    // Añadir mensaje de error
+                    setMessages(prev => [...prev, {
+                        _id: `error-${Date.now()}`,
+                        text: ack.error,
+                        sender: 'ai-assistant',
+                        senderType: 'ai',
+                        createdAt: new Date().toISOString(),
+                        error: true
+                    }]);
 
-                // Añadir el mensaje de respuesta de la IA
-                const aiMessage = response.data.data.aiMessage;
-                setMessages(prev => [...prev, aiMessage]);
-
-                // Guardar el ID de conversación si es nuevo
-                if (!aiConversationId && response.data.data.conversationId) {
-                    setAiConversationId(response.data.data.conversationId);
+                    setIsAISending(false);
                 }
-            } else {
-                throw new Error(response.data.message || 'Error al procesar la solicitud a la IA');
-            }
+                // Si success, los eventos userMessageToIASent y newMessageFromIA se encargarán de actualizar la UI.
+            });
         } catch (error) {
             console.error('Error al enviar mensaje a IA:', error);
 
-            // Marcar mensaje como fallido
-            setMessages(prev => prev.map(msg =>
-                msg._id === tempId ? { ...msg, error: true, temporary: false } : msg
-            ));
-
-            // Añadir mensaje de error de la IA
-            const errorMessage = {
-                _id: `error-${Date.now()}`,
-                text: 'Lo siento, no pude procesar tu mensaje. Por favor, intenta de nuevo más tarde.',
-                sender: 'ai-assistant',
-                senderType: 'ai',
-                createdAt: new Date().toISOString(),
-                error: true
-            };
-
-            setMessages(prev => [...prev, errorMessage]);
-        } finally {
             setIsAISending(false);
         }
-    }, [isAIChatActive, isAISending, aiConversationId, selectedAIModel, user, tempMessageIdCounter, urlApi, token]);
+    }, [isAIChatActive, isAISending, aiConversationId, selectedAIModel, user, tempMessageIdCounter, socket]);
 
     // MARK: markConversationAsRead
     // Función para marcar conversación como leída

@@ -109,7 +109,7 @@ export const useChatFetchers = (
         setLoadingMessages(true);
 
         try {
-            const endpoint = `${urlApi}/ai-api/${conversationId}/messages?page=${page}&limit=${limit}`;
+            const endpoint = `${urlApi}/ai-api/conversations/${conversationId}/messages?page=${page}&limit=${limit}`;
             console.log('Obteniendo mensajes IA desde:', endpoint);
 
             const response = await axios.get(endpoint, {
