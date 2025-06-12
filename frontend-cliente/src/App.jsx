@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
-import Navbar from './components/Layout/Navbar'
 import { Routes, Route } from 'react-router-dom'
+import { ToastContainer } from 'react-toastify'
+import 'react-toastify/dist/ReactToastify.css'
+import Navbar from './components/Layout/Navbar'
 import Inicio from './pages/Inicio/Inicio'
 import Carrito from './pages/Carrito/Carrito'
 import TomarOrden from './pages/TomarOrden/TomarOrden'
@@ -45,7 +47,19 @@ const App = () => {
       <Footer />
 
       <FloatingChatButton />
-
+      
+      <ToastContainer 
+        position="bottom-right"
+        autoClose={5000}
+        hideProgressBar={false}
+        newestOnTop={false}
+        closeOnClick
+        rtl={false}
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="light"
+      />
     </div>
   )
 }

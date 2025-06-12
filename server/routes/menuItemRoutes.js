@@ -7,7 +7,8 @@ import {
   removeMenuItem, 
   updateMenuItem, 
   restoreMenuItem,
-  getUniqueCategories 
+  getUniqueCategories,
+  searchMenuItems
 } from "../controllers/menuItemController.js"
 import multer from "multer"
 import { protect, authorize } from "../middleware/authMiddleware.js"
@@ -32,5 +33,6 @@ menuItemRouter.delete("/remove/:id", protect, authorize("admin"), removeMenuItem
 menuItemRouter.put("/update/:id", protect, authorize("admin"), upload.single("imageUrl"), updateMenuItem)
 menuItemRouter.put("/restore/:id", protect, authorize("admin"), restoreMenuItem);
 menuItemRouter.get('/categories', protect, getUniqueCategories);
+menuItemRouter.get('/search', searchMenuItems);
 
 export default menuItemRouter;

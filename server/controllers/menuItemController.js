@@ -174,14 +174,61 @@ const restoreMenuItem = async (req, res, next) => {
 // Obtener todas las categorías únicas
 const getUniqueCategories = async (req, res, next) => {
   try {
-    const categories = await menuItemModel.distinct('category', { isDeleted: { $ne: true } });
+    const categories = await menuItemModel.distinct('category');
     res.json({
       success: true,
-      categories: categories.sort()
+      message: "Categorías obtenidas correctamente",
+      data: categories
     });
   } catch (error) {
     console.error('Error al obtener las categorías:', error);
     next(new ApiError(500, 'Error al obtener las categorías'));
+  }
+};
+
+// Buscar ítems del menú
+const searchMenuItems = async (req, res, next) => {
+  try {
+    const { query, category, maxPrice, limit = 5 } = req.query;
+    
+    if (!query) {
+      return next(new ApiError(400, 'El parámetro de búsqueda es requerido'));
+    }
+
+    const searchQuery = {
+      $and: [
+        { deleted: { $ne: true } }, // No incluir eliminados
+        {
+          $or: [
+            { name: { $regex: query, $options: 'i' } },
+            { description: { $regex: query, $options: 'i' } },
+            { category: { $regex: query, $options: 'i' } }
+          ]
+        }
+      ]
+    };
+
+    // Aplicar filtros adicionales si se proporcionan
+    if (category) {
+      searchQuery.$and.push({ category: { $regex: new RegExp(`^${category}$`, 'i') } });
+    }
+    
+    if (maxPrice) {
+      searchQuery.$and.push({ price: { $lte: parseFloat(maxPrice) } });
+    }
+
+    const items = await menuItemModel.find(searchQuery)
+      .limit(parseInt(limit))
+      .lean();
+
+    res.json({
+      success: true,
+      message: 'Búsqueda completada',
+      data: items
+    });
+  } catch (error) {
+    console.error('Error al buscar ítems del menú:', error);
+    next(new ApiError(500, 'Error al buscar ítems del menú'));
   }
 };
 
@@ -193,5 +240,6 @@ export {
   removeMenuItem,
   updateMenuItem,
   restoreMenuItem,
-  getUniqueCategories
+  getUniqueCategories,
+  searchMenuItems
 }

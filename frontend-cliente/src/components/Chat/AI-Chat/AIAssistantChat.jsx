@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { ChatContext } from '../../../context/chat/ChatContext'; // Ajusta la ruta
 import { useAuth } from '../../../context/AuthContext';
 import MessageItem from '../MessageItem';
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './AIAssistantChat.css'; // Mantienes tus estilos
 
 const AIAssistantChat = () => {
@@ -34,8 +36,16 @@ const AIAssistantChat = () => {
 
   const handleSendMessage = (e) => {
     e.preventDefault();
-    if (newMessageInput.trim() && selectedAIModel) {
-      sendMessageToIA(); // ChatContext se encarga del payload
+    
+    if (!selectedAIModel) {
+      // Mostrar toast de error si no hay modelo seleccionado
+      toast.error('Por favor selecciona un modelo de IA antes de enviar un mensaje');
+      return;
+    }
+    
+    if (newMessageInput.trim()) {
+      console.log('Enviando mensaje con modelo:', selectedAIModel);
+      sendMessageToIA(newMessageInput, selectedAIModel);
     }
   };
 
@@ -51,7 +61,9 @@ const AIAssistantChat = () => {
           <div className="ai-details">
             <h3>Asistente IA</h3>
             <p className="ai-status">
-                {selectedAIModel ? `Usando: ${selectedAIModel.name}` : 'Selecciona un modelo'}
+              {selectedAIModel 
+                ? `Usando: ${selectedAIModel.name} (${selectedAIModel.provider || 'Proveedor no especificado'})` 
+                : 'Selecciona un modelo'}
             </p>
           </div>
         </div>
@@ -72,19 +84,25 @@ const AIAssistantChat = () => {
               {aiModels.length === 0 ? (
                 <div className="no-models">No hay modelos disponibles</div>
               ) : (
-                aiModels.map(model => (
-                  <button
-                    key={model.modelId} // Usar modelId único
-                    className={`model-option ${selectedAIModel?.modelId === model.modelId ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedAIModel(model);
-                      setShowModelSelection(false);
-                      // Opcional: podrías querer iniciar una nueva conversación de IA o limpiar mensajes si el modelo cambia
-                    }}
-                  >
-                    {model.name} ({model.provider})
-                  </button>
-                ))
+                aiModels.map(model => {
+                  // Asegurarse de que el modelo tenga _id, si no usar modelId
+                  const modelId = model._id || model.modelId;
+                  return (
+                    <button
+                      key={modelId}
+                      className={`model-option ${selectedAIModel?._id === modelId ? 'selected' : ''}`}
+                      onClick={() => {
+                        // Crear un nuevo objeto con _id garantizado
+                        const modelToSelect = { ...model, _id: modelId };
+                        console.log('Modelo seleccionado:', modelToSelect);
+                        setSelectedAIModel(modelToSelect);
+                        setShowModelSelection(false);
+                      }}
+                    >
+                      {model.name} ({model.provider})
+                    </button>
+                  );
+                })
               )}
             </div>
           )}
@@ -124,21 +142,40 @@ const AIAssistantChat = () => {
       </div>
 
       <form className="ai-message-form" onSubmit={handleSendMessage}>
-        <input
-          type="text"
-          value={newMessageInput}
-          onChange={(e) => setNewMessageInput(e.target.value)}
-          placeholder={isConversationClosed ? "Esta conversación ha sido cerrada." : "Escribe tu pregunta aquí..."}
-          disabled={isAISending || !selectedAIModel || loadingMessages || isConversationClosed}
-        />
-        <button
-          type="submit"
-          disabled={isAISending || !newMessageInput.trim() || !selectedAIModel || loadingMessages || isConversationClosed}
-        >
-          {isAISending ? ( <div className="ai-send-loading"></div> ) : (
-            <svg width="24" height="24" viewBox="0 0 24 24"><path d="M22 2L11 13" stroke="currentColor" strokeWidth="2"/><path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2"/></svg>
-          )}
-        </button>
+        {!selectedAIModel && (
+          <div className="ai-model-prompt">
+            <p>Por favor selecciona un modelo de IA para comenzar a chatear</p>
+          </div>
+        )}
+        <div className="ai-message-form-container">
+          <input
+            type="text"
+            value={newMessageInput}
+            onChange={(e) => setNewMessageInput(e.target.value)}
+            placeholder={
+              !selectedAIModel 
+                ? "Selecciona un modelo para habilitar el chat" 
+                : isConversationClosed 
+                  ? "Esta conversación ha sido cerrada." 
+                  : "Escribe tu pregunta aquí..."
+            }
+            disabled={isAISending || !selectedAIModel || loadingMessages || isConversationClosed}
+          />
+          <button
+            type="submit"
+            disabled={isAISending || !newMessageInput.trim() || !selectedAIModel || loadingMessages || isConversationClosed}
+            title={!selectedAIModel ? "Selecciona un modelo de IA primero" : "Enviar mensaje"}
+          >
+            {isAISending ? ( 
+              <div className="ai-send-loading"></div> 
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24">
+                <path d="M22 2L11 13" stroke="currentColor" strokeWidth="2"/>
+                <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" strokeWidth="2"/>
+              </svg>
+            )}
+          </button>
+        </div>
       </form>
     </div>
   );

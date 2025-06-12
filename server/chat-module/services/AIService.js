@@ -2,7 +2,7 @@ import { ApiError } from '../../utils/errorHandler.js';
 import OllamaProvider from '../providers/OllamaProvider.js';
 import OpenAIProvider from '../providers/OpenAIProvider.js';
 import config from '../../config/index.js';
-import Message from '../../models/Message.js'; // Para cargar historial
+import Message from '../../models/Message.js';
 
 class AIService {
 
@@ -268,47 +268,40 @@ class AIService {
 			// pero el mensaje de IA no tiene un senderId de usuario.
 			const savedIAResponseMessage = await this.messageService.createMessage(aiResponseMessageData, { _id: null, role: 'system' }); // Pasamos un usuario 'system'
 
-			//? 8. Procesar tool_calls si existen
+			//? 5. Si la respuesta de la IA incluye tool_calls, necesitamos procesarlas
 			if (aiRawResponse.toolCalls && aiRawResponse.toolCalls.length > 0) {
+				console.log(`Procesando ${aiRawResponse.toolCalls.length} tool_calls...`);
 				const toolResults = [];
-				for (const toolCall of aiRawResponse.toolCalls) {
-					let toolResultContent;
-					let isError = false;
 
+				//? 6. Procesar cada tool_call secuencialmente
+				for (const toolCall of aiRawResponse.toolCalls) {
 					try {
-						//? Si el tool es 'escalate_to_human_agent', ejecutar handleEscalationTool
-						if (toolCall.function.name === "escalate_to_human_agent") {
-							const args = toolCall.function.arguments;
-							toolResultContent = await this.handleEscalationTool(requestingUser, conversationId, args);
-						}
-						//? Si el tool es 'search_menu_items', ejecutar _searchMenuItems
-						else if (toolCall.function.name === "search_menu_items") {
-							const args = typeof toolCall.function.arguments === 'string' 
-								? JSON.parse(toolCall.function.arguments) 
-								: toolCall.function.arguments;
-							
-							const searchResult = await this._searchMenuItems(args);
-							
-							if (searchResult.success) {
-								toolResultContent = JSON.stringify({
-									success: true,
-									items: searchResult.data,
-									message: searchResult.message
-								});
-							} else {
-								toolResultContent = JSON.stringify({
-									success: false,
-									error: searchResult.error,
-									details: searchResult.details || 'Error desconocido al buscar ítems del menú.',
-									message: 'No se pudieron cargar los ítems del menú.'
-								});
+						let toolResultContent;
+						const isError = false;
+
+						switch (toolCall.function.name) {
+							case 'search_menu_items':
+								toolResultContent = await this.handleMenuSearch(
+									requestingUser,
+									typeof toolCall.function.arguments === 'string' 
+										? JSON.parse(toolCall.function.arguments) 
+										: toolCall.function.arguments
+								);
+								break;
+
+							case 'escalate_to_human_agent':
+								toolResultContent = await this.handleEscalationTool(
+									requestingUser,
+									conversationId,
+									typeof toolCall.function.arguments === 'string'
+										? JSON.parse(toolCall.function.arguments)
+										: toolCall.function.arguments
+								);
+								break;
+
+							default:
+								toolResultContent = `Error: Función '${toolCall.function.name}' no implementada.`;
 								isError = true;
-							}
-						}
-						// ... else if (toolCall.function.name === "otra_tool") ...
-						else {
-							toolResultContent = `Error: Herramienta desconocida '${toolCall.function.name}'.`;
-							isError = true;
 						}
 					} catch (toolError) {
 						console.error(`Error ejecutando herramienta ${toolCall.function.name}:`, toolError);
@@ -316,10 +309,10 @@ class AIService {
 						isError = true;
 					}
 
-					//? 9. Guardar el resultado de la herramienta (con messageService.createMessage)
+					// Crear y guardar el mensaje de resultado de la herramienta
 					const toolResultMessageData = {
 						conversationId,
-						senderType: 'tool', // O 'system' si prefieres
+						senderType: 'system',
 						senderId: null, // La herramienta no es un User
 						content: toolResultContent,
 						type: 'toolResult',
@@ -327,11 +320,18 @@ class AIService {
 						toolCallId: toolCall.id, // Importante para OpenAI
 						isError
 					};
-					const savedToolResultMessage = await this.messageService.createMessage(toolResultMessageData, { _id: null, role: 'system' });
+
+					// Guardar el mensaje de resultado
+					const savedToolResultMessage = await this.messageService.createMessage(
+						toolResultMessageData, 
+						{ _id: null, role: 'system' }
+					);
+
+					// Agregar a los resultados para enviar de vuelta a la IA
 					toolResults.push({
 						role: 'tool',
 						tool_call_id: toolCall.id,
-						name: toolCall.function.name, // Para OpenAI, el 'name' va en el mensaje de resultado de la tool
+						name: toolCall.function.name,
 						content: toolResultContent
 					});
 				}
@@ -382,6 +382,67 @@ class AIService {
 		}
 	}
 
+
+	/**
+	 * Maneja la búsqueda de ítems del menú cuando es solicitada por la IA.
+	 * @param {Object} user - El usuario que realizó la solicitud
+	 * @param {Object} args - Argumentos de la búsqueda
+	 * @param {string} args.query - Término de búsqueda
+	 * @param {string} [args.category] - Categoría para filtrar
+	 * @param {number} [args.maxPrice] - Precio máximo
+	 * @param {number} [args.limit=5] - Límite de resultados
+	 * @returns {Promise<string>} Respuesta formateada con los resultados
+	 */
+	async handleMenuSearch(user, { query, category, maxPrice, limit = 5 }) {
+		try {
+			// Importar dinámicamente el controlador de menú
+			const { searchMenuItems } = await import('../../controllers/menuItemController.js');
+			
+			// Crear un objeto de solicitud simulada
+			const req = {
+				query: { query, category, maxPrice, limit },
+				user: { _id: user._id }
+			};
+			
+			// Crear un objeto de respuesta simulado
+			let responseData;
+			const res = {
+				status: (code) => ({
+					json: (data) => { responseData = data; }
+				}),
+				json: (data) => { responseData = data; }
+			};
+
+			// Llamar directamente al controlador
+			await searchMenuItems(req, res);
+
+			// Verificar si hay resultados
+			if (!responseData?.success || !responseData?.data || responseData.data.length === 0) {
+				return 'No encontré ítems que coincidan con tu búsqueda. ¿Te gustaría intentar con otros términos?';
+			}
+
+			// Formatear la respuesta
+			const items = responseData.data;
+			let responseText = 'Encontré los siguientes ítems que podrían interesarte:\n\n';
+
+			items.forEach((item, index) => {
+				responseText += `${index + 1}. *${item.name}* - $${item.price?.toFixed(2) || 'Precio no disponible'}\n`;
+				responseText += `   ${item.description || 'Sin descripción'}\n`;
+				if (item.category) {
+					responseText += `   Categoría: ${item.category}\n`;
+				}
+				responseText += '\n';
+			});
+
+			return responseText;
+
+		} catch (error) {
+			console.error('Error al buscar ítems del menú:', error);
+			return 'Lo siento, hubo un error al buscar en el menú. Por favor, inténtalo de nuevo más tarde.';
+		}
+	}
+
+
 	/**
 	 * Maneja la escalada a un agente humano cuando un usuario hace una solicitud explícita o el asistente de IA no puede resolver la consulta después de varios intentos o si el tema es muy sensible o complejo.
 	 * @param {User} requestingUser - El usuario que inició la escalada
@@ -390,6 +451,10 @@ class AIService {
 	 *    - `reason`: Un resumen conciso de la consulta del usuario y por qué se necesita la escalada. Incluye cualquier contexto relevante de la conversación.
 	 *    - `urgency`: La urgencia percibida de la solicitud del usuario.
 	 * @returns {Promise<string>} Contenido para el 'toolResult' con el resultado de la escalada. La IA enviará este contenido al usuario como respuesta final.
+	 */
+	/**
+	 * Maneja la escalada a un agente humano cuando un usuario hace una solicitud explícita
+	 * o el asistente de IA no puede resolver la consulta después de varios intentos.
 	 */
 	async handleEscalationTool(requestingUser, conversationId, args) {
 		// Lógica para escalar a un agente humano
@@ -400,40 +465,34 @@ class AIService {
 		return `He escalado tu solicitud a un agente humano con urgencia ${args.urgency}. Un agente se pondrá en contacto contigo lo antes posible.`; // Contenido para el 'toolResult'
 	}
 
-	async _searchMenuItems({ query }) {
-		try {
-			// Aquí implementarías la lógica para buscar ítems del menú
-			// Por ejemplo, usando un servicio de menú o consultando la base de datos
-			const menuItems = await this.messageService.searchMenuItems(query);
-			
-			return {
-				success: true,
-				data: menuItems,
-				message: 'Ítems del menú encontrados'
-			};
-		} catch (error) {
-			console.error('Error al buscar ítems del menú:', error);
-			return {
-				success: false,
-				error: 'No se pudieron cargar los ítems del menú',
-				details: error.message
-			};
-		}
-	}
-
 	_getToolDefinitions(providerName) {
 		const commonTools = [
 			{
 				type: "function",
 				function: {
 					name: "search_menu_items",
-					description: "Busca ítems del menú por nombre, descripción o ingredientes. Úsalo cuando el usuario pregunte por platos, comidas o bebidas disponibles.",
+					description: "Busca ítems del menú por nombre, descripción o categoría. Úsalo cuando el usuario pregunte sobre platos, bebidas o cualquier otro ítem del menú.",
 					parameters: {
 						type: "object",
 						properties: {
 							query: {
 								type: "string",
-								description: "Términos de búsqueda para encontrar ítems del menú (nombres, ingredientes, tipos de comida, etc.)"
+								description: "Término de búsqueda para encontrar ítems del menú. Puede ser el nombre, ingredientes o descripción.",
+							},
+							category: {
+								type: "string",
+								description: "Categoría específica para filtrar los resultados (ej. 'platos principales', 'postres', 'bebidas').",
+								required: false
+							},
+							maxPrice: {
+								type: "number",
+								description: "Precio máximo de los ítems a buscar.",
+								required: false
+							},
+							limit: {
+								type: "integer",
+								description: "Número máximo de resultados a devolver.",
+								default: 5
 							}
 						},
 						required: ["query"]
@@ -459,8 +518,8 @@ class AIService {
 								default: "medium"
 							}
 						},
-						required: ["reason"]
-					}
+						required: ["reason"],
+					},
 				}
 			}
 		];
