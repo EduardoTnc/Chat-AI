@@ -305,33 +305,26 @@ class AIService {
                     let isError = false;
 
                     try {
-                        switch (toolCall.function.name) {
-                            case 'search_menu_items':
-                                toolResultContent = await this.handleMenuSearch(
-                                    requestingUser,
-                                    typeof toolCall.function.arguments === 'string'
-                                        ? JSON.parse(toolCall.function.arguments)
-                                        : toolCall.function.arguments
-                                );
-                                break;
+                        const toolName = toolCall.function.name;
+                        const toolArgs = typeof toolCall.function.arguments === 'string'
+                            ? JSON.parse(toolCall.function.arguments)
+                            : toolCall.function.arguments;
 
-                            case 'escalate_to_human_agent':
-                                toolResultContent = await this.handleEscalationTool(
-                                    requestingUser,
-                                    conversationId,
-                                    typeof toolCall.function.arguments === 'string'
-                                        ? JSON.parse(toolCall.function.arguments)
-                                        : toolCall.function.arguments
-                                );
-                                break;
+                        const metadata = {
+                            userId: requestingUser._id,
+                            conversationId,
+                            userRole: requestingUser.role
+                        };
 
-                            default:
-                                toolResultContent = `Error: Función '${toolCall.function.name}' no implementada.`;
-                                isError = true;
-                        }
+                        // Use the handleToolCall method to process all tool calls
+                        const result = await this.handleToolCall(toolName, toolArgs, metadata);
+                        toolResultContent = JSON.stringify(result);
                     } catch (toolError) {
-                        console.error(`Error ejecutando herramienta ${toolCall.function.name}:`, toolError);
-                        toolResultContent = `Error al procesar la herramienta ${toolCall.function.name}: ${toolError.message}`;
+                        console.error(`Error ejecutando herramienta ${toolCall.function?.name || 'desconocida'}:`, toolError);
+                        toolResultContent = JSON.stringify({
+                            success: false,
+                            error: toolError.message || 'Error al procesar la solicitud'
+                        });
                         isError = true;
                     }
 
@@ -630,28 +623,128 @@ class AIService {
         ];
     }
 
+    /**
+     * Maneja las llamadas a herramientas del asistente de IA
+     * @param {string} toolName - Nombre de la herramienta a ejecutar
+     * @param {Object} toolArgs - Argumentos para la herramienta
+     * @param {Object} metadata - Metadatos adicionales (userId, conversationId, etc.)
+     * @returns {Promise<Object>} Resultado de la herramienta
+     */
+    /**
+     * Formatea el estado de un pedido en un texto legible
+     * @param {string} status - Estado del pedido
+     * @returns {string} Texto formateado
+     * @private
+     */
+    _getOrderStatusText(status) {
+        const statusMap = {
+            'pending': '⏳ Pendiente',
+            'confirmed': '✅ Confirmado',
+            'preparing': '👨‍🍳 En preparación',
+            'ready': '🚗 Listo para entregar',
+            'on_delivery': '🛵 En camino',
+            'delivered': '🏠 Entregado',
+            'cancelled': '❌ Cancelado',
+            'refunded': '💸 Reembolsado'
+        };
+        
+        return statusMap[status] || status;
+    }
+
+    /**
+     * Maneja las llamadas a herramientas del asistente de IA
+     * @param {string} toolName - Nombre de la herramienta a ejecutar
+     * @param {Object} toolArgs - Argumentos para la herramienta
+     * @param {Object} metadata - Metadatos adicionales (userId, conversationId, etc.)
+     * @returns {Promise<Object>} Resultado de la herramienta
+     */
     async handleToolCall(toolName, toolArgs, metadata) {
-        const { userId } = metadata;
+        const { userId, conversationId } = metadata;
         
         try {
             switch (toolName) {
                 case 'searchMenuItems':
-                    return await this.publicDataService.searchMenuItems(
-                        toolArgs.query,
+                    // Hacer la búsqueda más flexible
+                    const query = toolArgs.query || '';
+                    
+                    // Si no hay término de búsqueda, devolver categorías populares
+                    if (!query.trim()) {
+                        const categories = await this.publicDataService.getMenuCategories();
+                        if (categories.success && categories.data?.length > 0) {
+                            return {
+                                success: true,
+                                message: 'Estas son las categorías disponibles. ¿Te gustaría ver los elementos de alguna categoría en particular?',
+                                categories: categories.data,
+                                isCategoryList: true
+                            };
+                        }
+                    }
+                    
+                    // Realizar búsqueda normal
+                    const menuItems = await this.publicDataService.searchMenuItems(
+                        query,
                         {
                             category: toolArgs.category,
-                            limit: toolArgs.limit || 5
+                            limit: toolArgs.limit || 10, // Aumentar límite por defecto
+                            isAvailable: true
                         }
                     );
                     
+                    // Formatear mejor los resultados
+                    if (menuItems.success && menuItems.data?.length > 0) {
+                        return {
+                            success: true,
+                            items: menuItems.data,
+                            count: menuItems.data.length,
+                            query: query,
+                            category: toolArgs.category
+                        };
+                    } else {
+                        return {
+                            success: false,
+                            message: `No encontré elementos que coincidan con "${query}"`,
+                            suggestions: ['Prueba con términos más generales', 'Revisa la ortografía', 'Explora nuestras categorías']
+                        };
+                    }
+                    
                 case 'getOrderStatus':
-                    return await this.publicDataService.getOrderStatus(
+                    // Si no se proporciona orderId, obtener el último pedido del usuario
+                    if (!toolArgs.orderId) {
+                        const orderHistory = await this.publicDataService.getOrderHistory(
+                            userId,
+                            { limit: 1, page: 1 }
+                        );
+                        
+                        if (orderHistory.success && orderHistory.orders?.length > 0) {
+                            // Usar el ID del pedido más reciente
+                            toolArgs.orderId = orderHistory.orders[0]._id;
+                        } else {
+                            return {
+                                success: false,
+                                message: 'No encontré pedidos recientes. ¿Te gustaría realizar un pedido?',
+                                noOrders: true
+                            };
+                        }
+                    }
+                    
+                    // Obtener estado del pedido
+                    const orderStatus = await this.publicDataService.getOrderStatus(
                         toolArgs.orderId,
                         userId
                     );
                     
+                    if (orderStatus.success) {
+                        return {
+                            success: true,
+                            order: orderStatus.data,
+                            orderId: toolArgs.orderId
+                        };
+                    } else {
+                        return orderStatus; // Devolver el error original
+                    }
+                    
                 case 'getOrderHistory':
-                    return await this.publicDataService.getOrderHistory(
+                    const history = await this.publicDataService.getOrderHistory(
                         userId,
                         {
                             limit: toolArgs.limit || 5,
@@ -659,43 +752,181 @@ class AIService {
                         }
                     );
                     
+                    if (history.success) {
+                        return {
+                            success: true,
+                            orders: history.orders,
+                            total: history.total,
+                            page: toolArgs.page || 1,
+                            hasMore: (toolArgs.page || 1) * (toolArgs.limit || 5) < history.total
+                        };
+                    } else {
+                        return history; // Devolver el error original
+                    }
+                    
                 case 'getMenuCategories':
-                    return await this.publicDataService.getMenuCategories();
+                    const categories = await this.publicDataService.getMenuCategories();
+                    if (categories.success) {
+                        return {
+                            success: true,
+                            categories: categories.data,
+                            count: categories.data?.length || 0
+                        };
+                    } else {
+                        return categories; // Devolver el error original
+                    }
                     
                 default:
-                    throw new Error(`Herramienta no soportada: ${toolName}`);
+                    console.warn(`Herramienta no implementada: ${toolName}`);
+                    return {
+                        success: false,
+                        error: 'Esta función no está disponible en este momento',
+                        tool: toolName
+                    };
             }
         } catch (error) {
             console.error(`Error en la herramienta ${toolName}:`, error);
             return {
                 success: false,
-                error: error.message || 'Error al procesar la solicitud'
+                error: 'Ocurrió un error al procesar tu solicitud. Por favor, inténtalo de nuevo más tarde.',
+                details: process.env.NODE_ENV === 'development' ? error.message : undefined
             };
         }
     }
 
+    /**
+     * Procesa la respuesta de la IA y formatea los resultados de las herramientas
+     * @param {Object} aiResponse - Respuesta de la IA que puede contener llamadas a herramientas
+     * @param {Object} metadata - Metadatos adicionales (userId, conversationId, etc.)
+     * @returns {Promise<Object>} Respuesta formateada para el usuario
+     */
     async processAIResponse(aiResponse, metadata) {
-        // If there are no tool calls, return the response as is
+        // Si no hay llamadas a herramientas, devolver la respuesta tal cual
         if (!aiResponse.tool_calls || aiResponse.tool_calls.length === 0) {
             return aiResponse;
         }
 
-        // Process each tool call
+        // Procesar cada llamada a herramienta
         const toolResults = await Promise.all(
             aiResponse.tool_calls.map(async (toolCall) => {
                 try {
                     const toolName = toolCall.function.name;
-                    const toolArgs = JSON.parse(toolCall.function.arguments);
+                    let toolArgs = {};
+                    
+                    try {
+                        toolArgs = JSON.parse(toolCall.function.arguments);
+                    } catch (e) {
+                        console.warn('Error al analizar argumentos de la herramienta:', e);
+                    }
                     
                     console.log(`Llamando a herramienta: ${toolName}`, toolArgs);
                     
+                    // Ejecutar la herramienta
                     const result = await this.handleToolCall(toolName, toolArgs, metadata);
+                    
+                    // Formatear la respuesta de la herramienta
+                    let formattedContent = '';
+                    
+                    switch (toolName) {
+                        case 'searchMenuItems':
+                            if (result.success) {
+                                if (result.isCategoryList) {
+                                    formattedContent = '📋 *Categorías disponibles*:\n\n';
+                                    formattedContent += result.categories.map(cat => `• ${cat}`).join('\n');
+                                    formattedContent += '\n\n¿Sobre qué categoría te gustaría más información?';
+                                } else if (result.items?.length > 0) {
+                                    formattedContent = `🍽️ *Resultados para "${result.query}"`;
+                                    if (result.category) {
+                                        formattedContent += ` en la categoría "${result.category}"`;
+                                    }
+                                    formattedContent += ` (${result.count} ${result.count === 1 ? 'resultado' : 'resultados'}):\n\n`;
+                                    
+                                    formattedContent += result.items.map((item, index) => {
+                                        let itemText = `*${index + 1}. ${item.name}*`;
+                                        if (item.price) itemText += ` - $${item.price.toFixed(2)}`;
+                                        if (item.description) itemText += `\n   ${item.description}`;
+                                        if (item.category) itemText += `\n   🏷️ Categoría: ${item.category}`;
+                                        return itemText;
+                                    }).join('\n\n');
+                                }
+                            } else {
+                                formattedContent = result.message || 'No pude encontrar lo que buscas.';
+                                if (result.suggestions?.length > 0) {
+                                    formattedContent += '\n\n*Sugerencias:*\n';
+                                    formattedContent += result.suggestions.map(s => `• ${s}`).join('\n');
+                                }
+                            }
+                            break;
+                            
+                        case 'getOrderStatus':
+                            if (result.success) {
+                                const order = result.order;
+                                formattedContent = `📦 *Estado de tu pedido #${result.orderId.slice(-6)}*\n\n`;
+                                formattedContent += `Estado actual: *${this._getOrderStatusText(order.status)}*\n`;
+                                formattedContent += `Fecha: ${new Date(order.createdAt).toLocaleString()}\n`;
+                                formattedContent += `Total: $${order.totalAmount?.toFixed(2) || '0.00'}\n\n`;
+                                
+                                if (order.items?.length > 0) {
+                                    formattedContent += '*Productos:*\n';
+                                    formattedContent += order.items.map(item => 
+                                        `• ${item.quantity}x ${item.name} - $${(item.price * item.quantity).toFixed(2)}`
+                                    ).join('\n');
+                                }
+                            } else if (result.noOrders) {
+                                formattedContent = result.message;
+                            } else {
+                                formattedContent = 'No pude encontrar información sobre tu pedido. ';
+                                formattedContent += 'Por favor, verifica el número de pedido o contacta con soporte.';
+                            }
+                            break;
+                            
+                        case 'getOrderHistory':
+                            if (result.success && result.orders?.length > 0) {
+                                formattedContent = `📜 *Historial de pedidos* (${result.total} en total)\n\n`;
+                                
+                                formattedContent += result.orders.map(order => {
+                                    let orderText = `*Pedido #${order._id.slice(-6)}* - `;
+                                    orderText += `${new Date(order.createdAt).toLocaleDateString()}\n`;
+                                    orderText += `Estado: ${this._getOrderStatusText(order.status)}\n`;
+                                    orderText += `Total: $${order.totalAmount?.toFixed(2) || '0.00'}\n`;
+                                    
+                                    if (order.items?.length > 0) {
+                                        orderText += `${order.items.reduce((sum, item) => sum + item.quantity, 0)} `;
+                                        orderText += order.items.length === 1 ? 'producto' : 'productos';
+                                    }
+                                    
+                                    return orderText;
+                                }).join('\n\n');
+                                
+                                if (result.hasMore) {
+                                    formattedContent += '\n\n*Nota:* Hay más pedidos disponibles. ';
+                                    formattedContent += `Puedes pedir ver la página ${(result.page || 1) + 1} con "ver más pedidos".`;
+                                }
+                            } else {
+                                formattedContent = 'No encontré pedidos anteriores en tu historial.';
+                            }
+                            break;
+                            
+                        case 'getMenuCategories':
+                            if (result.success && result.categories?.length > 0) {
+                                formattedContent = '📋 *Categorías del menú*\n\n';
+                                formattedContent += result.categories.map(cat => `• ${cat}`).join('\n');
+                                formattedContent += '\n\nPregúntame por los elementos de alguna categoría en particular.';
+                            } else {
+                                formattedContent = 'No pude cargar las categorías en este momento. Por favor, inténtalo más tarde.';
+                            }
+                            break;
+                            
+                        default:
+                            // Para herramientas sin formato específico
+                            formattedContent = JSON.stringify(result, null, 2);
+                    }
                     
                     return {
                         tool_call_id: toolCall.id,
                         role: 'tool',
                         name: toolName,
-                        content: JSON.stringify(result)
+                        content: formattedContent || 'No hay información disponible.'
                     };
                 } catch (error) {
                     console.error('Error procesando llamada a herramienta:', error);
@@ -720,18 +951,19 @@ class AIService {
     }
 
     _getToolDefinitions(providerName) {
+        // Define all available tools with their specifications
         const commonTools = [
             {
                 type: "function",
                 function: {
-                    name: "search_menu_items",
+                    name: "searchMenuItems",
                     description: "Busca ítems del menú por nombre, descripción o categoría. Úsalo cuando el usuario pregunte sobre platos, bebidas o cualquier otro ítem del menú.",
                     parameters: {
                         type: "object",
                         properties: {
                             query: {
                                 type: "string",
-                                description: "Término de búsqueda para encontrar ítems del menú. Puede ser el nombre, ingredientes o descripción.",
+                                description: "Término de búsqueda para encontrar ítems del menú. Puede ser el nombre, ingredientes o descripción."
                             },
                             category: {
                                 type: "string",
@@ -746,22 +978,70 @@ class AIService {
                                 description: "Número máximo de resultados a devolver.",
                                 default: 5
                             }
-                        },
-                        required: ["query"]
+                        }
                     }
                 }
             },
             {
                 type: "function",
                 function: {
-                    name: "escalate_to_human_agent",
+                    name: "getOrderStatus",
+                    description: "Obtiene el estado actual de un pedido. Si no se proporciona un ID de pedido, devuelve el estado del pedido más reciente del usuario.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            orderId: {
+                                type: "string",
+                                description: "ID del pedido (opcional, si no se proporciona, se usará el pedido más reciente)"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "getOrderHistory",
+                    description: "Obtiene el historial de pedidos del usuario.",
+                    parameters: {
+                        type: "object",
+                        properties: {
+                            limit: {
+                                type: "integer",
+                                description: "Número máximo de pedidos a devolver (por defecto: 5)",
+                                default: 5
+                            },
+                            page: {
+                                type: "integer",
+                                description: "Número de página para la paginación (por defecto: 1)",
+                                default: 1
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "getMenuCategories",
+                    description: "Obtiene la lista de categorías de menú disponibles",
+                    parameters: {
+                        type: "object",
+                        properties: {}
+                    }
+                }
+            },
+            {
+                type: "function",
+                function: {
+                    name: "escalateToHumanAgent",
                     description: "Escala la conversación actual a un agente humano cuando el usuario lo solicita explícitamente o cuando el asistente de IA no puede resolver la consulta después de varios intentos o si el tema es muy sensible o complejo.",
                     parameters: {
                         type: "object",
                         properties: {
                             reason: {
                                 type: "string",
-                                description: "Un resumen conciso de la consulta del usuario y por qué se necesita la escalada. Incluye cualquier contexto relevante de la conversación.",
+                                description: "Un resumen conciso de la consulta del usuario y por qué se necesita la escalada. Incluye cualquier contexto relevante de la conversación."
                             },
                             urgency: {
                                 type: "string",
@@ -770,17 +1050,23 @@ class AIService {
                                 default: "medium"
                             }
                         },
-                        required: ["reason"],
-                    },
+                        required: ["reason"]
+                    }
                 }
             }
         ];
-        if (providerName.toLowerCase() === 'openai') {
-            return [...commonTools, ...this.getPublicDataTools()];
-        } else if (providerName.toLowerCase() === 'ollama') {
-            return [...commonTools, ...this.getPublicDataTools()];
+
+        // Return tools based on provider
+        if (!providerName) {
+            return commonTools;
         }
-        return undefined;
+
+        const normalizedProvider = providerName.toLowerCase();
+        if (['openai', 'ollama'].includes(normalizedProvider)) {
+            return [...commonTools, ...(this.getPublicDataTools() || [])];
+        }
+        
+        return commonTools;
     }
 }
 
