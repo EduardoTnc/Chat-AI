@@ -266,6 +266,8 @@ const ChatContextProvider = ({ children }) => {
         // Acciones de chat con IA
         selectAIChat,
         sendMessageToIA,
+        setMessages,
+        fetchAIMessages,
 
         // Fetchers (para paginación o recarga)
         fetchConversations,

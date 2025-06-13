@@ -14,7 +14,25 @@ export const useApiKeyStore = create<State>((set) => ({
   setKeys: (keys: ApiKey[]) => set({ keys }),
   addKey: (key: ApiKey) => set((state) => ({ keys: [...state.keys, key] })),
   removeKey: (provider: string) =>
-    set((state) => ({ keys: state.keys.filter((k) => k.provider !== provider) })),
-  updateKey: (key: ApiKey) =>
-    set((state) => ({ keys: state.keys.map((k) => (k.provider === key.provider ? key : k)) })),
+    set((state) => ({
+      keys: state.keys.filter((k) => k.provider !== provider),
+    })),
+  updateKey: (updatedKey: ApiKey) =>
+    set((state) => ({
+      keys: state.keys.map((existingKey) => {
+        if (existingKey._id === updatedKey._id) {
+          // Merge the existing key with the updated fields
+          return {
+            ...existingKey,  // Keep all existing fields
+            ...updatedKey,   // Apply all updates
+            // Ensure we don't accidentally remove any fields
+            provider: updatedKey.provider || existingKey.provider,
+            description: updatedKey.description ?? existingKey.description,
+            maskedKey: updatedKey.maskedKey || existingKey.maskedKey,
+            status: updatedKey.status || existingKey.status || 'active',
+          };
+        }
+        return existingKey;
+      }),
+    })),
 }));

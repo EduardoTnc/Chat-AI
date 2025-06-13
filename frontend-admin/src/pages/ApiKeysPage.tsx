@@ -1,18 +1,33 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { listApiKeys } from '@/api/apiKeyService';
 import { useApiKeyStore } from '@/store/apiKeyStore';
 import ApiKeysTable from '@/components/admin/apiKeys/ApiKeysTable';
 import CreateApiKeyDialog from '@/components/admin/apiKeys/CreateApiKeyDialog';
 import { PageHeader } from '@/components/admin/layout/PageHeader';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const ApiKeysPage = () => {
-  const { setKeys } = useApiKeyStore();
+  const { setKeys, keys } = useApiKeyStore();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    (async () => {
-      const keys = await listApiKeys();
-      setKeys(keys);
-    })();
+    const fetchApiKeys = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const fetchedKeys = await listApiKeys();
+        setKeys(fetchedKeys);
+      } catch (err) {
+        console.error('Error loading API keys:', err);
+        setError('No se pudieron cargar las claves API. Por favor, intenta de nuevo.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchApiKeys();
   }, [setKeys]);
 
   return (
@@ -24,7 +39,19 @@ const ApiKeysPage = () => {
         >
           <CreateApiKeyDialog />
         </PageHeader>
-        <ApiKeysTable />
+        
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        <ApiKeysTable 
+          isLoading={isLoading} 
+          error={error}
+          keys={keys}
+        />
       </main>
     </div>
   );

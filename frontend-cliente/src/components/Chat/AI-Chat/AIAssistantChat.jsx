@@ -14,25 +14,55 @@ const AIAssistantChat = () => {
     sendMessageToIA, // Nueva función específica
     aiModels, selectedAIModel, setSelectedAIModel,
     fetchAIModels, // Para cargar modelos
+    fetchAIMessages, // Para cargar mensajes
     isAISending,
     aiConversationId, // ID de la conversación con la IA
     loadingMessages, // Para cuando se cargan mensajes de IA
-    // selectAIChat, // Ya estamos en el chat de IA
+    setMessages, // Para limpiar mensajes
   } = useContext(ChatContext);
   const { user: currentUser } = useAuth();
 
   const [showModelSelection, setShowModelSelection] = useState(false);
   const messagesEndRef = useRef(null);
 
+  // Sort messages by timestamp to ensure correct order
+  const sortedMessages = React.useMemo(() => {
+    return [...messages].sort((a, b) => {
+      const dateA = new Date(a.createdAt || a.timestamp || 0);
+      const dateB = new Date(b.createdAt || b.timestamp || 0);
+      return dateA - dateB; // Oldest first
+    });
+  }, [messages]);
+
+  // Load models on mount
   useEffect(() => {
     if (aiModels.length === 0) {
       fetchAIModels();
     }
   }, [fetchAIModels, aiModels.length]);
 
+  // Load messages when conversation changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (aiConversationId) {
+      console.log('Loading messages for conversation:', aiConversationId);
+      fetchAIMessages(aiConversationId);
+    } else if (selectedAIModel) {
+      // If we have a selected model but no conversation, clear messages
+      console.log('No conversation ID, clearing messages');
+      setMessages([]);
+    }
+  }, [aiConversationId, selectedAIModel, fetchAIMessages, setMessages]);
+
+  // Scroll to bottom when messages or loading state changes
+  useEffect(() => {
+    if (!loadingMessages) {
+      // Small timeout to ensure DOM is updated
+      const timer = setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [messages, loadingMessages]);
 
   const handleSendMessage = (e) => {
     e.preventDefault();
@@ -52,6 +82,83 @@ const AIAssistantChat = () => {
   const isConversationClosed = messages.some(
     (msg) => msg.type === 'systemNotification' && msg.content?.toLowerCase().includes('conversación cerrada')
   );
+
+  // Función para formatear las respuestas de las herramientas
+  const formatToolResponse = (toolName, data) => {
+    try {
+      switch (toolName) {
+        case 'searchMenuItems':
+          if (!data.success || !data.data || data.data.length === 0) {
+            return 'No se encontraron resultados.';
+          }
+          return data.data.map(item => 
+            `• ${item.name} - $${item.price?.toFixed(2)}\n  ${item.description || ''}`
+          ).join('\n\n');
+        
+        case 'getOrderStatus':
+          if (!data.success) return data.error || 'No se pudo obtener el estado del pedido.';
+          return `Estado del pedido #${data.data._id}: ${data.data.status}\nTotal: $${data.data.totalAmount.toFixed(2)}`;
+        
+        case 'getOrderHistory':
+          if (!data.success || !data.data || data.data.length === 0) {
+            return 'No tienes pedidos recientes.';
+          }
+          return 'Tus pedidos recientes:\n' + data.data.map(order => 
+            `• #${order._id} - ${new Date(order.createdAt).toLocaleDateString()}\n  Estado: ${order.status}\n  Total: $${order.totalAmount.toFixed(2)}`
+          ).join('\n\n');
+        
+        case 'getMenuCategories':
+          if (!data.success || !data.data || data.data.length === 0) {
+            return 'No se encontraron categorías.';
+          }
+          return 'Categorías disponibles:\n' + data.data.map(cat => `• ${cat}`).join('\n');
+        
+        default:
+          return 'Respuesta recibida.';
+      }
+    } catch (error) {
+      console.error('Error formateando respuesta de herramienta:', error);
+      return 'Se recibió una respuesta inesperada.';
+    }
+  };
+
+  // Renderizado condicional de mensajes
+  const renderMessage = (message) => {
+    if (message.type === 'toolResult') {
+      let toolName = '';
+      let toolData = {};
+      
+      try {
+        const content = JSON.parse(message.content);
+        toolName = content.toolName || '';
+        toolData = content.data || {};
+      } catch (e) {
+        console.error('Error parsing tool result:', e);
+        return (
+          <div className="tool-response">
+            <div className="tool-name">Error</div>
+            <div className="tool-content">
+              No se pudo procesar la respuesta de la herramienta.
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="tool-response">
+          <div className="tool-name">
+            {toolName ? `Resultado de ${toolName}` : 'Resultado de herramienta'}
+          </div>
+          <div className="tool-content">
+            {formatToolResponse(toolName, toolData)}
+          </div>
+        </div>
+      );
+    }
+    
+    // Mensaje normal
+    return <MessageItem key={message._id || message.tempId} message={message} isOwn={message.senderId?._id === currentUser?._id && message.senderType === 'user'} />;
+  };
 
   return (
     <div className="ai-chat-container">
@@ -112,7 +219,8 @@ const AIAssistantChat = () => {
       <div className="ai-messages-area">
         {loadingMessages && messages.length === 0 ? (
           <div className="ai-loading-conversation">
-            <div className="ai-loading-spinner"></div> <p>Cargando...</p>
+            <div className="ai-loading-spinner"></div> 
+            <p>Cargando mensajes...</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="ai-empty-conversation">
@@ -120,24 +228,36 @@ const AIAssistantChat = () => {
               <h3>¡Hola! Soy tu Asistente IA</h3>
               <p>Selecciona un modelo y pregúntame lo que necesites.</p>
             </div>
-            {/* ... (sugerencias como antes) ... */}
           </div>
         ) : (
-          messages.map((message, idx) => (
-            <MessageItem
-              key={message._id || message.tempId || idx}
-              message={message}
-              isOwn={message.senderId?._id === currentUser?._id && message.senderType === 'user'}
-            />
-          ))
+          <>
+            {sortedMessages.map((msg) => {
+              // Ensure message has required fields
+              const messageWithDefaults = {
+                ...msg,
+                senderType: msg.senderType || (msg.sender === currentUser?._id ? 'user' : 'assistant'),
+                content: msg.content || ''
+              };
+              
+              return (
+                <MessageItem
+                  key={msg._id || `temp-${msg.tempId}`}
+                  message={messageWithDefaults}
+                  isOwn={messageWithDefaults.senderType === 'user'}
+                />
+              );
+            })}
+            {isAISending && (
+              <div className="ai-typing">
+                <div className="ai-typing-indicator">
+                  <span></span><span></span><span></span>
+                </div>
+                <p>El asistente está pensando...</p>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
         )}
-        {isAISending && (
-          <div className="ai-typing">
-            <div className="ai-typing-indicator"><span></span><span></span><span></span></div>
-            <p>El asistente está pensando...</p>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
       </div>
 
       <form className="ai-message-form" onSubmit={handleSendMessage}>

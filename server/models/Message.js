@@ -14,7 +14,7 @@ const messageSchema = new mongoose.Schema({
     },
     senderType: { // El tipo de remitente
         type: String,
-        enum: ['user', 'IA', 'agent', 'tool', 'systemNotification'],
+        enum: ['user', 'IA', 'agent', 'tool', 'systemNotification', 'system'],
         required: true,
     },
     receiverId: { // Puede ser null si el receptor es la IA

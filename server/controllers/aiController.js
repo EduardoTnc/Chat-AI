@@ -47,7 +47,11 @@ export const getAIConversationMessages = async (req, res, next) => {
         // Esto es una doble verificación, idealmente el servicio ya lo haría.
         if (messages.length > 0) {
             const firstMessageConv = await messageService.getConversationById(conversationId);
-            if (!firstMessageConv || firstMessageConv.type !== 'user-to-ia' || !firstMessageConv.participants.some(p => p.equals(userId))) {
+            if (!firstMessageConv || firstMessageConv.type !== 'user-to-ia' || 
+                !firstMessageConv.participants.some(p => {
+                    const participantId = p._id ? p._id.toString() : p.toString();
+                    return participantId === userId.toString();
+                })) {
                 return next(new ApiError('No autorizado para acceder a esta conversación de IA.', 403));
             }
         }

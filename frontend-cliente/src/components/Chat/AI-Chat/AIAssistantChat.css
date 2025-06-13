@@ -294,6 +294,62 @@
   cursor: not-allowed;
 }
 
+/* Tool Response Styles */
+.tool-response {
+  background-color: #f0f7ff;
+  border-left: 3px solid #4a90e2;
+  padding: 12px 16px;
+  margin: 12px 0;
+  border-radius: 0 8px 8px 0;
+  max-width: 85%;
+  margin-left: auto;
+  margin-right: 0;
+  text-align: left;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.tool-name {
+  font-weight: 600;
+  color: #2c5282;
+  margin-bottom: 8px;
+  font-size: 0.85em;
+  text-transform: capitalize;
+  display: flex;
+  align-items: center;
+}
+
+.tool-name::before {
+  content: '⚙️';
+  margin-right: 6px;
+  font-size: 1em;
+}
+
+.tool-content {
+  white-space: pre-line;
+  font-size: 0.95em;
+  line-height: 1.5;
+  color: #2d3748;
+}
+
+/* Make sure message content has proper line breaks */
+.message-content {
+  white-space: pre-line;
+  word-break: break-word;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .tool-response {
+    max-width: 90%;
+    padding: 10px 12px;
+  }
+  
+  .tool-content {
+    font-size: 0.9em;
+  }
+}
+
 .ai-message-form button {
   flex-shrink: 0;
   width: 46px;

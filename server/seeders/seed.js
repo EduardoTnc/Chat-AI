@@ -61,7 +61,7 @@ const seedAiModelsConfigs = async () => {
         await connectDBForSeed();
 
         // Limpiar colecciones existentes (opcional, pero útil para consistencia)
-        console.log(chalk.yellow('Limpiando colecciones AIModelConfig, ApiKeyStore y Message...'));
+        console.log(chalk.yellow('Limpiando colecciones AIModelConfig y ApiKeyStore...'));
         await AIModelConfig.deleteMany({});
         await ApiKeyStore.deleteMany({});
         // await Message.deleteMany({});
@@ -71,9 +71,18 @@ const seedAiModelsConfigs = async () => {
             {
                 modelId: 'ollama-llama3.2-3b-q4km',
                 provider: 'ollama',
-                name: 'Llama 3.2 (3B)',
+                name: 'Asistente de Restaurante (Llama 3.2)',
                 apiIdentifier: 'llama3.2:3b',
-                systemPrompt: 'Eres un asistente de IA que responde a las preguntas de los usuarios, debes intentar resolver la consulta del usuario de la mejor manera posible y solo si no puedes resolver la consulta debes usar las tools para resolverla.',
+                systemPrompt: `Eres un asistente virtual para el restaurante, especializado en brindar información sobre nuestro menú, promociones y servicios. 
+
+INSTRUCCIONES IMPORTANTES:
+1. Solo responde preguntas relacionadas con el restaurante, su menú, promociones, horarios y servicios.
+2. Para consultas sobre menú, precios o disponibilidad, DEBES usar la función search_menu_items.
+3. Si no tienes información precisa sobre una pregunta, usa las funciones disponibles para obtenerla.
+4. No respondas preguntas fuera del contexto del restaurante. Para temas ajenos, responde amablemente que solo puedes ayudar con información del restaurante.
+5. Mantén un tono amable y profesional en todo momento.
+6. Para consultas sobre pedidos existentes, usa la función check_order_status.
+7. Si el cliente necesita asistencia que no puedes proporcionar, ofrécete a escalar la conversación a un agente humano.`,
                 isVisibleToClient: true,
                 allowedRoles: ['user', 'agent', 'admin'],
                 supportsTools: true,
@@ -81,63 +90,57 @@ const seedAiModelsConfigs = async () => {
             {
                 modelId: 'ollama-qwen3-8b',
                 provider: 'ollama',
-                name: 'Qwen 3 (8B)',
+                name: 'Asistente de Menú (Qwen 3)',
                 apiIdentifier: 'qwen3:8b',
-                systemPrompt: 'Eres un asistente de IA útil y conciso, potenciado por Qwen 3, debes intentar resolver la consulta del usuario de la mejor manera posible y solo si no puedes resolver la consulta debes usar las tools para resolverla.',
+                systemPrompt: `Eres un experto en el menú del restaurante, especializado en describir platos, ingredientes y hacer recomendaciones.
+
+DIRECTRICES:
+- Usa la función search_menu_items para TODA consulta sobre el menú, precios o disponibilidad.
+- No inventes información que no tengas en la base de datos.
+- Para preguntas sobre alérgenos o ingredientes, verifica siempre con la función antes de responder.
+- Si no estás seguro de algo, dilo abiertamente y ofrece buscar la información.
+- Mantén las respuestas concisas y centradas en la consulta del cliente.`,
                 isVisibleToClient: true,
                 allowedRoles: ['user', 'agent', 'admin'],
                 supportsTools: true,
             },
             {
-                modelId: 'ollama-gemma3-4b',
-                provider: 'ollama',
-                name: 'Gemma 3 (4B)',
-                apiIdentifier: 'gemma3:4b',
-                systemPrompt: 'Eres un asistente de IA útil, potenciado por Gemma 3, debes intentar resolver la consulta del usuario de la mejor manera posible.',
-                isVisibleToClient: true,
-                allowedRoles: ['user', 'agent', 'admin'],
-                supportsTools: false,
-            },
-            {
-                modelId: 'ollama-gemma3-1b',
-                provider: 'ollama',
-                name: 'Gemma 3 (1B)',
-                apiIdentifier: 'gemma3:1b',
-                systemPrompt: 'Eres un asistente de IA útil, potenciado por Gemma 3, debes intentar resolver la consulta del usuario de la mejor manera posible.',
-                isVisibleToClient: true,
-                allowedRoles: ['user', 'agent', 'admin'],
-                supportsTools: false,
-            },
-            {
-                modelId: 'openai-gpt-3.5-turbo',
+                modelId: 'openai-gpt-4o',
                 provider: 'openai',
-                name: 'GPT-3.5 Turbo',
-                apiIdentifier: 'gpt-3.5-turbo', // ID oficial de OpenAI
-                systemPrompt: 'Eres GPT-3.5 Turbo, un asistente de IA útil, debes intentar resolver la consulta del usuario de la mejor manera posible y solo si no puedes resolver la consulta debes usar las tools para resolverla.',
+                name: 'Asistente Premium (GPT-4o)',
+                apiIdentifier: 'gpt-4o-2024-08-06',
+                systemPrompt: `Eres un asistente virtual avanzado para el restaurante con acceso a las siguientes funciones:
+
+FUNCIONES DISPONIBLES:
+1. search_menu_items: Para consultar el menú, precios y disponibilidad
+2. check_order_status: Para verificar el estado de pedidos
+3. get_opening_hours: Para consultar horarios de atención
+4. get_promotions: Para información sobre promociones vigentes
+
+REGLAS ESTRICTAS:
+- NUNCA inventes información sobre el restaurante que no estés 100% seguro.
+- Para CUALQUIER consulta que requiera datos específicos (precios, disponibilidad, ingredientes), DEBES usar las funciones disponibles.
+- Si no tienes la información solicitada, usa las funciones para obtenerla.
+- Mantén un tono profesional pero cercano.
+- No respondas preguntas fuera del ámbito del restaurante.`,
                 isVisibleToClient: true,
-                allowedRoles: ['user', 'agent', 'admin'],
-                supportsTools: true, // gpt-3.5-turbo soporta function calling
-            },
-            {
-                modelId: 'openai-gpt-4-turbo',
-                provider: 'openai',
-                name: 'GPT-4 Turbo',
-                apiIdentifier: 'gpt-4-turbo-preview', // o el ID actual de GPT-4 Turbo
-                systemPrompt: 'Eres GPT-4 Turbo, un asistente de IA avanzado y capaz.',
-                isVisibleToClient: true, // Quizás solo para admins/agents inicialmente
-                allowedRoles: ['admin', 'agent'],
+                allowedRoles: ['user', 'admin', 'agent'],
                 supportsTools: true,
             },
-            // Modelo no visible para cliente normal
+            // Modelo interno para desarrollo
             {
                 modelId: 'internal-debug-model',
                 provider: 'custom',
-                name: 'Modelo Interno (No Visible)',
+                name: 'Modelo de Desarrollo (No Visible)',
                 apiIdentifier: 'debug-model-v1',
-                systemPrompt: 'Soy un modelo de depuración.',
-                isVisibleToClient: false, // NO visible
+                systemPrompt: `Modelo de desarrollo para pruebas. Todas las respuestas deben incluir "[DEBUG]" al inicio. 
+
+- Usa funciones para TODA consulta de datos.
+- Registra las decisiones de razonamiento.
+- No asumas información que no te sea proporcionada.`,
+                isVisibleToClient: false,
                 allowedRoles: ['admin'],
-                supportsTools: false,
+                supportsTools: true,
             },
         ];
 

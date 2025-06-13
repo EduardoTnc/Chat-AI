@@ -1,4 +1,5 @@
 import './MessageItem.css';
+import PropTypes from 'prop-types';
 
 const MessageItem = ({ message, isOwn }) => {
   const formatTime = (timestamp) => {
@@ -12,7 +13,7 @@ const MessageItem = ({ message, isOwn }) => {
   if (!isOwn) {
     if (message.senderType === 'IA') extraClass = 'ia-message';
     else if (message.senderType === 'agent') extraClass = 'agent-message';
-    else if (message.senderType === 'systemNotification' || message.senderType === 'tool') extraClass = 'system-message';
+    else if (['system', 'systemNotification', 'tool'].includes(message.senderType)) extraClass = 'system-message';
   }
 
   return (
@@ -44,6 +45,25 @@ const MessageItem = ({ message, isOwn }) => {
       </div>
     </div>
   );
+};
+
+MessageItem.propTypes = {
+  message: PropTypes.shape({
+    _id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    content: PropTypes.string.isRequired,
+    senderId: PropTypes.shape({
+      _id: PropTypes.string,
+      name: PropTypes.string
+    }),
+    senderType: PropTypes.oneOf(['user', 'IA', 'agent', 'system', 'systemNotification', 'tool']),
+    createdAt: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+    timestamp: PropTypes.oneOfType([PropTypes.string, PropTypes.instanceOf(Date)]),
+  }).isRequired,
+  isOwn: PropTypes.bool
+};
+
+MessageItem.defaultProps = {
+  isOwn: false
 };
 
 export default MessageItem;

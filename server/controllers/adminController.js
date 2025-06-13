@@ -1,13 +1,11 @@
 // server/controllers/adminController.js
 import AdminConfigService from '../chat-module/services/AdminConfigService.js';
-import MessageService from '../chat-module/services/MessageService.js';
 import { ApiError } from '../utils/errorHandler.js';
-import User from '../models/User.js'; // Para buscar agentes
 
 const adminConfigService = new AdminConfigService();
-const messageService = new MessageService();
 
 // MARK: - AI Model Configurations
+
 export const getAllAIModelConfigsCtrl = async (req, res, next) => {
     try {
         const configs = await adminConfigService.getAllAIModelConfigs();
@@ -19,40 +17,93 @@ export const getAllAIModelConfigsCtrl = async (req, res, next) => {
 
 export const createAIModelConfigCtrl = async (req, res, next) => {
     try {
-        // Validar req.body según el schema de AIModelConfig
-        const newConfig = await adminConfigService.createAIModelConfig(req.body);
+        const { 
+            name, 
+            provider, 
+            modelId, 
+            apiIdentifier, 
+            systemPrompt, 
+            isVisibleToClient, 
+            allowedRoles, 
+            supportsTools, 
+            isActive,
+            description,
+            isDefault,
+            apiKeyId // Nuevo campo para la referencia a la API key
+        } = req.body;
+
+        // Validación básica
+        if (!name || !provider || !modelId || !apiIdentifier) {
+            throw new ApiError(400, 'Faltan campos requeridos');
+        }
+
+        // Validar que si el proveedor no es 'custom', se proporcione una API key
+        if (provider !== 'custom' && !apiKeyId) {
+            throw new ApiError(400, 'Se requiere una API key para modelos que no son personalizados');
+        }
+
+        const newConfig = await adminConfigService.createAIModelConfig({
+            name,
+            provider,
+            modelId,
+            apiIdentifier,
+            systemPrompt: systemPrompt || "Eres un asistente de IA que responde a las preguntas de los usuarios.",
+            isVisibleToClient: Boolean(isVisibleToClient),
+            allowedRoles: Array.isArray(allowedRoles) ? allowedRoles : ['user'],
+            supportsTools: Boolean(supportsTools),
+            isActive: Boolean(isActive),
+            description: description || '',
+            isDefault: Boolean(isDefault),
+            apiKeyId: apiKeyId || null // Pasar el ID de la API key si existe
+        });
+
         res.status(201).json({ success: true, data: newConfig });
     } catch (error) {
         next(error);
     }
 };
 
-export const getAIModelConfigCtrl = async (req, res, next) => { // Por modelId del sistema
-    try {
-        const { modelId } = req.params;
-        const config = await adminConfigService.getAIModelConfig(modelId);
-        if (!config) throw new ApiError(404, `Configuración para modelId '${modelId}' no encontrada.`);
-        res.status(200).json({ success: true, data: config });
-    } catch (error) {
-        next(error);
-    }
-};
-export const getAIModelConfigByInternalIdCtrl = async (req, res, next) => { // Por _id de mongo
+export const getAIModelConfigByInternalIdCtrl = async (req, res, next) => {
     try {
         const { internalId } = req.params;
         const config = await adminConfigService.getAIModelConfigByInternalId(internalId);
-        // getAIModelConfigByInternalId ya lanza error si no se encuentra
         res.status(200).json({ success: true, data: config });
     } catch (error) {
         next(error);
     }
 };
 
-
 export const updateAIModelConfigCtrl = async (req, res, next) => {
     try {
-        const { internalId } = req.params; // Usar el _id de MongoDB para la actualización
-        const updatedConfig = await adminConfigService.updateAIModelConfig(internalId, req.body);
+        const { internalId } = req.params;
+        const { apiKeyId, ...updateData } = req.body; // Extraer apiKeyId del body
+        
+        // Asegurarse de que los campos booleanos sean booleanos
+        if ('isVisibleToClient' in updateData) updateData.isVisibleToClient = Boolean(updateData.isVisibleToClient);
+        if ('supportsTools' in updateData) updateData.supportsTools = Boolean(updateData.supportsTools);
+        if ('isActive' in updateData) updateData.isActive = Boolean(updateData.isActive);
+        if ('isDefault' in updateData) updateData.isDefault = Boolean(updateData.isDefault);
+        
+        // Validar allowedRoles
+        if (updateData.allowedRoles && !Array.isArray(updateData.allowedRoles)) {
+            throw new ApiError(400, 'allowedRoles debe ser un array');
+        }
+
+        // Si se está actualizando el proveedor a uno que no sea 'custom' y no se proporciona apiKeyId
+        if (updateData.provider && updateData.provider !== 'custom' && apiKeyId === undefined) {
+            // Verificar si el modelo actual ya tiene una clave API
+            const currentModel = await adminConfigService.getAIModelConfigByInternalId(internalId);
+            if (!currentModel.apiKeyRef) {
+                throw new ApiError(400, 'Se requiere una API key para modelos que no son personalizados');
+            }
+        }
+
+        // Si se proporciona apiKeyId, incluirlo en los datos de actualización
+        if (apiKeyId !== undefined) {
+            updateData.apiKeyId = apiKeyId;
+        }
+
+        const updatedConfig = await adminConfigService.updateAIModelConfig(internalId, updateData);
         res.status(200).json({ success: true, data: updatedConfig });
     } catch (error) {
         next(error);
@@ -61,9 +112,25 @@ export const updateAIModelConfigCtrl = async (req, res, next) => {
 
 export const deleteAIModelConfigCtrl = async (req, res, next) => {
     try {
-        const { internalId } = req.params; // Usar el _id de MongoDB
-        const result = await adminConfigService.deleteAIModelConfig(internalId);
-        res.status(200).json({ success: true, message: result.message });
+        const { internalId } = req.params;
+        await adminConfigService.deleteAIModelConfig(internalId);
+        res.status(200).json({ 
+            success: true, 
+            message: 'Configuración de modelo eliminada correctamente' 
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Obtener modelos visibles para el rol del usuario
+// Ruta: GET /api/admin/ai-models/visible?role=user
+// No requiere autenticación (puede ser usado por el frontend público)
+export const getVisibleAIModelsCtrl = async (req, res, next) => {
+    try {
+        const role = req.query.role || 'user';
+        const models = await adminConfigService.getVisibleAIModels(role);
+        res.status(200).json({ success: true, data: models });
     } catch (error) {
         next(error);
     }
@@ -79,14 +146,56 @@ export const getAllApiKeyStatusesCtrl = async (req, res, next) => {
     }
 };
 
+/**
+ * Guarda o actualiza una API Key para un proveedor específico.
+ * Si se proporciona isUpdate=true, permite actualizar solo la descripción sin necesidad de proporcionar una nueva API Key.
+ * 
+ * @param {Object} req - Objeto de solicitud de Express
+ * @param {Object} req.body - Cuerpo de la solicitud
+ * @param {string} req.body.provider - Nombre del proveedor (requerido)
+ * @param {string} [req.body.apiKey] - La API Key a guardar (opcional si isUpdate=true y solo se actualiza la descripción)
+ * @param {string} [req.body.description] - Descripción opcional para la API Key
+ * @param {boolean} [req.body.isUpdate] - Indica si es una actualización (permite actualizar solo la descripción)
+ * @param {Object} res - Objeto de respuesta de Express
+ * @param {Function} next - Función de middleware de Express
+ */
 export const saveApiKeyCtrl = async (req, res, next) => {
     try {
-        const { provider, apiKey, description } = req.body;
-        if (!provider || !apiKey) {
-            return next(new ApiError(400, "Provider y apiKey son requeridos."));
+        const { provider, apiKey, description = '', isUpdate = false } = req.body;
+        
+        // Validar que se proporcione el proveedor
+        if (!provider) {
+            return next(new ApiError(400, 'El campo "provider" es requerido.'));
         }
-        const result = await adminConfigService.saveApiKey(provider, apiKey, description);
-        res.status(200).json({ success: true, data: result, message: `API Key para ${provider} guardada.` });
+        
+        // Si no es una actualización, validar que se proporcione una API Key
+        if (!isUpdate && !apiKey) {
+            return next(new ApiError(400, 'El campo "apiKey" es requerido para crear una nueva API Key.'));
+        }
+        
+        // Si es una actualización, validar que se proporcione al menos un campo para actualizar
+        if (isUpdate && !apiKey && description === undefined) {
+            return next(new ApiError(400, 'Debe proporcionar al menos un campo para actualizar (apiKey o description).'));
+        }
+        
+        // Llamar al servicio para guardar o actualizar la API Key
+        const result = await adminConfigService.saveApiKey(
+            provider, 
+            apiKey, 
+            description, 
+            isUpdate
+        );
+        
+        // Determinar el mensaje de éxito apropiado
+        const message = isUpdate 
+            ? `API Key para ${provider} actualizada correctamente.` 
+            : `API Key para ${provider} guardada correctamente.`;
+        
+        res.status(200).json({ 
+            success: true, 
+            data: result, 
+            message 
+        });
     } catch (error) {
         next(error);
     }
