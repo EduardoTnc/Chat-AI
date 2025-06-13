@@ -53,9 +53,10 @@ export interface Order {
   __v?: number;
 }
 
-export const listOrdersAdmin = async (): Promise<Order[]> => {
+export const listOrdersAdmin = async (statuses?: Order['status'][]): Promise<Order[]> => {
   try {
-    const res = await api.get(`${PREFIX}/list-admin`);
+    const params = statuses && statuses.length ? { statuses: statuses.join(',') } : undefined;
+    const res = await api.get(`${PREFIX}/list-admin`, { params });
     return res.data.orders || [];
   } catch (error) {
     if (error instanceof AxiosError) {

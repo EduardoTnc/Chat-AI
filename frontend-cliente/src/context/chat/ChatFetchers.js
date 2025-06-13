@@ -159,6 +159,7 @@ export const useChatFetchers = (
 
             if (response.data.success) {
                 const models = response.data.data;
+                console.log("models", response.data);
                 console.log(`${models.length} modelos IA obtenidos`);
                 setAiModels(models);
 

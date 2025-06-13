@@ -63,8 +63,15 @@ const listOrders = async (req, res) => {
 // Listar ordenes para el panel de administrador
 const listOrdersAdmin = async (req, res) => {
     try {
-        const orders = await orderModel.find({})
-        res.json({ success: true, message: "Ordenes listadas correctamente", orders })
+        // Permitir filtrar por estado: ?statuses=pending,in_progress,completed
+        const { statuses } = req.query;
+        const filter = {};
+        if (statuses) {
+            const statusArray = statuses.split(',').map(s => s.trim());
+            filter.status = { $in: statusArray };
+        }
+        const orders = await orderModel.find(filter);
+        res.json({ success: true, message: "Ordenes listadas correctamente", orders });
     } catch (error) {
         console.log(error)
         res.json({ success: false, message: "Error al listar las ordenes" })

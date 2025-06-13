@@ -8,7 +8,7 @@ interface OrderState {
   orders: Order[];
   isLoading: boolean;
   error: string | null;
-  fetchOrders: () => Promise<void>;
+  fetchOrders: (statuses?: OrderStatus[]) => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<{ 
     success: boolean; 
     order?: Order;
@@ -22,10 +22,10 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchOrders: async () => {
+  fetchOrders: async (statuses?: OrderStatus[]) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await listOrdersAdmin();
+      const response = await listOrdersAdmin(statuses);
       set({ orders: response || [], error: null });
     } catch (error) {
       console.error('Error fetching orders:', error);

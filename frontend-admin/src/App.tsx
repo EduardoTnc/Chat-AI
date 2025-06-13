@@ -7,6 +7,7 @@ import AIModelsPage from './pages/AIModelsPage';
 import ApiKeysPage from './pages/ApiKeysPage';
 import OrdersPage from './pages/OrdersPage';
 import FullChatPage from './pages/FullChatPage';
+import DashboardPage from './pages/DashboardPage';
 import { useAuth } from './context/AuthContext';
 import AppSidebar from './components/admin/layout/AppSidebar';
 
@@ -19,7 +20,7 @@ function App() {
         <Route path="/login" element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />} />
         <Route element={<ProtectedRoute />}>
           <Route element={<AppSidebar />}>
-            <Route index element={<Navigate to="/users" />} />
+            <Route index element={<DashboardPage />} />
             <Route path='users' element={<UserManagementPage />} />
             <Route path="menu-items" element={<MenuItemsPage />} />
             <Route path="ai-models" element={<AIModelsPage />} />

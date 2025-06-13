@@ -16,17 +16,21 @@ const STATUS_OPTIONS = [
 
 type OrderStatus = StoreOrderStatus;
 
+type OrdersTableProps = {
+  statuses?: OrderStatus[];
+};
+
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-CO', {
+  return new Intl.NumberFormat('es-PE', {
     style: 'currency',
-    currency: 'COP',
+    currency: 'PEN',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount);
 };
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString('es-CO', {
+  return new Date(dateString).toLocaleString('es-PE', {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
@@ -35,7 +39,7 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const OrdersTable = () => {
+const OrdersTable = ({ statuses }: OrdersTableProps) => {
   const { 
     orders, 
     isLoading, 
@@ -47,8 +51,8 @@ const OrdersTable = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
+    fetchOrders(statuses);
+  }, [fetchOrders, JSON.stringify(statuses)]);
 
   const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
     if (!orderId || !newStatus) {
@@ -67,7 +71,7 @@ const OrdersTable = () => {
       }
       
       // Update the orders list with the new status
-      await fetchOrders();
+      await fetchOrders(statuses);
       
       toast.success(`Orden #${orderId.substring(orderId.length - 6).toUpperCase()}: ${getStatusLabel(newStatus)}`);
       
@@ -77,7 +81,7 @@ const OrdersTable = () => {
       toast.error(`Error al actualizar orden: ${errorMessage}`);
       
       // Refresh the orders to ensure consistency
-      await fetchOrders();
+      await fetchOrders(statuses);
     } finally {
       setUpdatingOrderId(null);
     }

@@ -237,6 +237,26 @@ class AIService {
         // Clean up any pending tool calls before starting a new response
         await this._cleanupPendingToolCalls(conversationId);
 
+        // Detect if the user explicitly asks for a human agent and bypass the AI provider
+        if (this._isEscalationRequest(userMessageContent)) {
+            const escalationContent = await this.handleEscalationTool(requestingUser, conversationId, {
+                reason: userMessageContent,
+                urgency: 'medium'
+            });
+
+            const escalationMessageData = {
+                conversationId,
+                senderId: null,
+                senderType: 'IA',
+                content: escalationContent,
+                type: 'IAResponse',
+                modelId: clientModelId
+            };
+            const savedEscalationMessage = await this.messageService.createMessage(escalationMessageData, { _id: null, role: 'system' });
+
+            return { finalMessage: savedEscalationMessage, originalToolCallingMessage: null };
+        }
+
         //? 1. Validar y obtener la configuración del modelo
         const modelConfig = await this.adminConfigService.getAIModelConfig(clientModelId);
         if (!modelConfig) {
@@ -1067,6 +1087,18 @@ class AIService {
         }
         
         return commonTools;
+    }
+
+    /**
+     * Detecta si el contenido del usuario solicita explícitamente hablar con un agente humano.
+     * @param {string} content
+     * @returns {boolean}
+     * @private
+     */
+    _isEscalationRequest(content = '') {
+        if (!content) return false;
+        const escalationRegex = /(humano|asistente humano|personal real|agente|representative|human agent|speak to (?:a )?human|transferir a|escalar|hablar con un)/i;
+        return escalationRegex.test(content);
     }
 }
 
