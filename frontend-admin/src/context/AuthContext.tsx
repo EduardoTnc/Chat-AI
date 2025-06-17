@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Create a separate axios instance for auth to avoid circular dependencies
 const authAxios = axios.create({
   withCredentials: true,
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5001',
+  baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${import.meta.env.VITE_API_PREFIX || '/api/v1'}`,
   headers: {
     'Content-Type': 'application/json',
   },

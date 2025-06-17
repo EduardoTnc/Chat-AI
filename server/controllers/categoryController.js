@@ -1,4 +1,5 @@
 import Category from '../models/Category.js';
+import mongoose from 'mongoose';
 import { ApiError } from '../utils/errorHandler.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -103,7 +104,7 @@ export const updateCategory = async (req, res, next) => {
       return next(new ApiError(404, `Categoría no encontrada con id ${req.params.id}`));
     }
 
-    // Check if name is being updated and if it's already taken
+    // Verifica si el nombre está siendo actualizado y si ya existe
     if (req.body.name && req.body.name !== category.name) {
       const categoryExists = await Category.findOne({ name: req.body.name });
       if (categoryExists) {
@@ -111,19 +112,19 @@ export const updateCategory = async (req, res, next) => {
       }
     }
 
-    // Handle new image upload if provided
+    // Maneja la subida de una nueva imagen si se proporciona
     if (req.file) {
-      // If there was a previous image, delete it
+      // Si había una imagen anterior, la elimina
       if (category.imageUrl) {
         try {
           const oldImagePath = path.join(__dirname, '../../', category.imageUrl);
           await fs.unlink(oldImagePath);
         } catch (error) {
           console.error('Error deleting old image:', error);
-          // Continue even if old image deletion fails
+          // Continúa incluso si la eliminación de la imagen anterior falla
         }
       }
-      // Set new image URL
+      // Establece la nueva URL de la imagen
       req.body.imageUrl = `/uploads/categories/${req.file.filename}`;
     }
 
@@ -154,25 +155,34 @@ export const deleteCategory = async (req, res, next) => {
       return next(new ApiError(404, `Categoría no encontrada con id ${req.params.id}`));
     }
 
-    // Delete the image file if it exists
+    // Elimina la imagen si existe
     if (category.imageUrl) {
       try {
-        const imagePath = path.join(__dirname, '../../', category.imageUrl);
+        const imagePath = path.join(process.cwd(), category.imageUrl);
         await fs.unlink(imagePath);
       } catch (error) {
+        // Si el archivo no existe o hay otro error, registra el error pero continua
         console.error('Error eliminando la imagen de la categoría:', error);
-        // Continue with category deletion even if image deletion fails
+        // Continúa con la eliminación de la categoría incluso si la eliminación de la imagen falla
       }
     }
 
-    // Soft delete
-    await category.remove();
+    // Elimina la categoría
+    await Category.findByIdAndDelete(req.params.id);
+
+    // Elimina esta categoría de cualquier elemento de menú que la esté referenciando
+    await mongoose.model('menuItem').updateMany(
+      { category: req.params.id },
+      { $unset: { category: "" } }
+    );
 
     res.status(200).json({
       success: true,
       data: {},
+      message: 'Categoría eliminada exitosamente'
     });
   } catch (error) {
-    next(error);
+    console.error('Error al eliminar la categoría:', error);
+    next(new ApiError(500, 'Error al eliminar la categoría', error.message));
   }
 };
