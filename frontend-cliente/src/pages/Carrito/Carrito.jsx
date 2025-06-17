@@ -1,16 +1,48 @@
-import React, { useContext } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { TiendaContext } from '../../context/TiendaContext';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const Carrito = () => {
-
-  const { carritoItems, listaPlatos, quitarDelCarrito, calcularMontoTotal } = useContext(TiendaContext);
-  const {urlApi} = useAuth();
-
-  const mobileScreen = window.innerWidth < 640;
-
+  const { carritoItems, listaPlatos, quitarDelCarrito, calcularMontoTotal, totalItems, vaciarCarrito } = useContext(TiendaContext);
+  const { urlApi } = useAuth();
   const navigate = useNavigate();
+  const mobileScreen = window.innerWidth < 640;
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Filter valid cart items that exist in listaPlatos
+  const validCartItems = useMemo(() => {
+    return Object.entries(carritoItems || {})
+      .filter(([itemId, qty]) => qty > 0 && listaPlatos.some(item => item?._id === itemId))
+      .map(([itemId, qty]) => {
+        const item = listaPlatos.find(p => p._id === itemId);
+        return item ? { ...item, quantity: qty } : null;
+      })
+      .filter(Boolean);
+  }, [carritoItems, listaPlatos]);
+
+  // Clear invalid cart items
+  useEffect(() => {
+    if (listaPlatos.length > 0) {
+      const invalidItems = Object.keys(carritoItems || {}).filter(
+        itemId => !listaPlatos.some(item => item._id === itemId)
+      );
+      
+      if (invalidItems.length > 0) {
+        invalidItems.forEach(itemId => quitarDelCarrito(itemId));
+      }
+      setIsLoading(false);
+    }
+  }, [listaPlatos, carritoItems, quitarDelCarrito]);
+
+  if (isLoading) {
+    return <div className='mt-24 text-center'>Cargando productos...</div>;
+  }
 
   return (
     <div className='mt-24'>
@@ -23,26 +55,43 @@ const Carrito = () => {
           <p className='col-span-1'>Quitar</p>
         </div>
         <hr className='text-gray-400' />
-        {listaPlatos.map((item) => {
-          if (carritoItems[item._id] > 0) {
-            return (
-              <>
-                <div className="grid grid-cols-6 items-center text-[12px] md:text-[16px] my-2.5 text-black">
-                  <div className='flex items-center gap-2 col-span-2'>
-                    <img src={urlApi + "/images/" + item.imageUrl} alt="" className={`object-cover rounded-2xl shadow ${mobileScreen ? "w-[30px] h-[30px]" : "w-[80px] h-[30px]"}`} />
-                    <p className={mobileScreen ? "" : "ms-2"}>{item.name}</p>
-                  </div>
-                  <p className='col-span-1'>S/.{item.price}</p>
-                  <p className='col-span-1'>{carritoItems[item._id]}</p>
-                  <p className='col-span-1'>S/.{item.price * carritoItems[item._id]}</p>
-                  <button onClick={() => quitarDelCarrito(item._id)} className={`col-span-1 cursor-pointer bg-red-500 text-white px-2 py-1 rounded-full ${mobileScreen ? "w-[40px]" : "w-[80px]"}`}>{mobileScreen ? "X" : "Quitar"}</button>
+        
+        {validCartItems.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-gray-500">Tu carrito está vacío</p>
+            <button 
+              onClick={() => navigate('/')}
+              className="mt-4 bg-tomato text-white px-4 py-2 rounded-full hover:bg-tomato/90"
+            >
+              Ver menú
+            </button>
+          </div>
+        ) : (
+          validCartItems.map((item) => (
+            <div key={item._id}>
+              <div className="grid grid-cols-6 items-center text-[12px] md:text-[16px] my-2.5 text-black">
+                <div className='flex items-center gap-2 col-span-2'>
+                  <img 
+                    src={`${urlApi}/images/${item.imageUrl}`} 
+                    alt={item.name} 
+                    className={`object-cover rounded-2xl shadow ${mobileScreen ? "w-[30px] h-[30px]" : "w-[80px] h-[30px]"}`} 
+                  />
+                  <p className={mobileScreen ? "" : "ms-2"}>{item.name}</p>
                 </div>
-                <hr className='text-gray-300 h-[1px]' />
-              </>
-
-            )
-          }
-        })}
+                <p className='col-span-1'>S/.{item.price.toFixed(2)}</p>
+                <p className='col-span-1'>{item.quantity}</p>
+                <p className='col-span-1'>S/.{(item.price * item.quantity).toFixed(2)}</p>
+                <button 
+                  onClick={() => quitarDelCarrito(item._id)} 
+                  className={`col-span-1 cursor-pointer bg-red-500 text-white px-2 py-1 rounded-full ${mobileScreen ? "w-[40px]" : "w-[80px]"}`}
+                >
+                  {mobileScreen ? "X" : "Quitar"}
+                </button>
+              </div>
+              <hr className='text-gray-300 h-[1px]' />
+            </div>
+          ))
+        )}
       </div>
 
       <div className='mt-20 flex flex-col sm:flex-row items-center sm:items-start justify-between  gap-8 '>

@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { assets } from '../../assets/assets';
-import { useAuth } from '../../context/AuthContext';
+import React, { useState, useContext } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { assets } from '../../assets/assets'
+import { useAuth } from '../../context/AuthContext'
+import { TiendaContext } from '../../context/TiendaContext'
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
 const Navbar = ({ onLoginClick }) => {
   const [menu, setMenu] = useState("Inicio");
   const navigate = useNavigate();
   const { token, isAuthenticated, logout, urlApi } = useAuth();
+  const { cartItems, totalItems, cartItemsWithDetails } = useContext(TiendaContext);
+  const [showCartPreview, setShowCartPreview] = useState(false);
 
   const handleLogout = async () => {
     if (token) {
@@ -22,6 +26,12 @@ const Navbar = ({ onLoginClick }) => {
     navigate("/");
   };
 
+  const handleCartClick = () => {
+    if (totalItems > 0) {
+      navigate("/cart");
+    }
+  };
+
   return (
     <div className='sticky top-0 z-[99] bg-white shadow-md'>
       <div className='w-[92%] md:w-[90%] lg:w-[80%] m-auto flex justify-between items-center p-5 '>
@@ -33,10 +43,83 @@ const Navbar = ({ onLoginClick }) => {
           <a href="#footer" onClick={() => setMenu("Contactanos")} className={`cursor-pointer ${menu === "Contactanos" ? "text-tomato font-bold border-b-2 border-tomato" : ""}`}>Contáctanos</a>
         </ul>
         <div className="flex items-center gap-2 lg:gap-5">
-          <img src={assets.search_icon} alt="" className='w-[20px] cursor-pointer' />
+          {/* <img src={assets.search_icon} alt="" className='w-[20px] cursor-pointer' /> */}
           <div className='relative'>
-            <Link to='/cart'><img src={assets.basket_icon} alt="" className='w-[20px] cursor-pointer' /></Link>
-            <div className='absolute min-w-[10px] min-h-[10px] bg-tomato rounded-full -top-[8px] right-[-8px]'></div>
+            <Link 
+              to={totalItems > 0 ? '/cart' : '#'}
+              onClick={handleCartClick}
+              onMouseEnter={() => setShowCartPreview(true)}
+              onMouseLeave={() => setShowCartPreview(false)}
+              className='relative p-2 rounded-full transition-colors'
+            >
+              <img 
+                src={assets.basket_icon} 
+                alt="Carrito de compras" 
+                className='w-5 h-5 cursor-pointer' 
+              />
+              {totalItems > 0 && (
+                <div className='absolute top-4 -right-1 min-w-[18px] h-[18px] bg-tomato text-white text-xs rounded-full flex items-center justify-center'>
+                  {totalItems}
+                </div>
+              )}
+            </Link>
+            
+            {/* Vista previa del carrito */}
+            <AnimatePresence>
+              {showCartPreview && cartItemsWithDetails.length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute right-0 top-full mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-100 z-50 overflow-hidden"
+                  onMouseEnter={() => setShowCartPreview(true)}
+                  onMouseLeave={() => setShowCartPreview(false)}
+                >
+                  <div className="p-3 border-b border-gray-100">
+                    <h4 className="font-semibold text-gray-800">Tu pedido</h4>
+                    <p className="text-xs text-gray-500">{totalItems} {totalItems === 1 ? 'ítem' : 'ítems'}</p>
+                  </div>
+                  
+                  <div className="max-h-72 overflow-y-auto">
+                    {cartItemsWithDetails.map((item) => (
+                      <div key={item._id} className="flex items-center p-3 hover:bg-gray-50 border-b border-gray-50">
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden mr-3">
+                          <img 
+                            src={`${urlApi}/images/${item.imageUrl}`} 
+                            alt={item.name} 
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{item.name}</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-500">{item.quantity} x S/.{item.price.toFixed(2)}</span>
+                            <span className="text-sm font-medium">S/.{(item.price * item.quantity).toFixed(2)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="p-3 bg-gray-50 border-t border-gray-100">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-medium">Total:</span>
+                      <span className="font-bold">
+                        S/.{cartItemsWithDetails.reduce((total, item) => total + (item.price * item.quantity), 0).toFixed(2)}
+                      </span>
+                    </div>
+                    <Link 
+                      to="/cart" 
+                      className="block w-full bg-tomato text-white text-center py-2 rounded-lg font-medium hover:bg-tomato/90 transition-colors"
+                      onClick={() => setShowCartPreview(false)}
+                    >
+                      Ver carrito
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           {!isAuthenticated ? (
             <button 

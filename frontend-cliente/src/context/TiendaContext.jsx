@@ -101,6 +101,20 @@ const TiendaContextProvider = (props) => {
     }
   };
 
+  // Calcular el total de ítems en el carrito
+  const totalItems = calcularCantidadTotal();
+  
+  // Obtener los ítems del carrito con sus detalles
+  const cartItemsWithDetails = Object.entries(carritoItems)
+    .filter(([_, qty]) => qty > 0)
+    .map(([itemId, qty]) => {
+      const item = listaPlatos.find(p => p._id === itemId);
+      return item ? { ...item, quantity: qty } : null;
+    })
+    .filter(Boolean);
+    
+  // Calcular el total del carrito
+  const cartTotal = calcularMontoTotal().toFixed(2);
 
   const contextValue = {
     listaPlatos,
@@ -109,8 +123,11 @@ const TiendaContextProvider = (props) => {
     agregarAlCarrito,
     quitarDelCarrito,
     calcularMontoTotal,
-    calcularCantidadTotal,
+    totalItems,
+    cartItemsWithDetails,
+    cartTotal,
     vaciarCarrito,
+    calcularCantidadTotal
   };
 
   return (
