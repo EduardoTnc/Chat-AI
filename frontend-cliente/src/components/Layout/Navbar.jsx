@@ -8,6 +8,8 @@ import axios from 'axios';
 
 const Navbar = ({ onLoginClick }) => {
   const [menu, setMenu] = useState("Inicio");
+  const [isHovering, setIsHovering] = useState(false);
+  const animationState = isHovering ? 'hover' : 'none';
   const navigate = useNavigate();
   const { token, isAuthenticated, logout, urlApi } = useAuth();
   const { cartItems, totalItems, cartItemsWithDetails } = useContext(TiendaContext);
@@ -122,25 +124,85 @@ const Navbar = ({ onLoginClick }) => {
             </AnimatePresence>
           </div>
           {!isAuthenticated ? (
-            <button 
+            <motion.button
+              whileHover={{ 
+                y: -2,
+                boxShadow: '0 2px 2px rgba(0,0,0,0.1)',
+                transition: { duration: 0.2 }
+              }}
+              whileTap={{ scale: 0.98 }}
               onClick={onLoginClick} 
-              className="border border-tomato hover:bg-tomato cursor-pointer transition-all duration-300 hover:text-white hover:translate-y-[-2px] hover:shadow-[0_2px_2px_0px_#0005] text-tomato px-2.5 py-2 rounded-full"
+              className="border border-tomato hover:bg-tomato cursor-pointer text-tomato px-2.5 py-2 rounded-full"
             >
               Iniciar Sesión
-            </button>
+            </motion.button>
           ) : (
-            <div className='relative cursor-pointer group'>
-              <img src={assets.profile_icon} alt="" className='w-[20px] transition-transform' />
-              <ul className='absolute hidden right-0 z-10 bg-white shadow-md group-hover:flex flex-col gap-2.5 px-4 py-6 rounded-2xl list-none w-[180px] animate-fade-in animate-duration-300 animate-ease-in'>
-                <li onClick={() => navigate("/mis-ordenes")} className='flex items-center gap-2.5 cursor-pointer hover:translate-y-[-2px] hover:text-tomato transition-all duration-300'><img src={assets.bag_icon} alt="" className='w-[20px]' /><p>Órdenes</p></li>
-                <li onClick={() => navigate("/mensajes")} className='flex items-center gap-2.5 cursor-pointer hover:translate-y-[-2px] hover:text-tomato transition-all duration-300'>
-                  <img src={assets.message_icon} alt="" className='w-[20px]' />
-                  <p>Mensajes</p>
-                </li>
-                <hr />
-                <li onClick={handleLogout} className='flex items-center gap-2.5 cursor-pointer hover:translate-y-[-2px] hover:text-tomato transition-all duration-300'><img src={assets.logout_icon} alt="" className='w-[20px]' /><p>Cerrar Sesión</p></li>
-              </ul>
-            </div>
+            <motion.div 
+              className='relative cursor-pointer'
+              onHoverStart={() => setIsHovering(true)}
+              onHoverEnd={() => setIsHovering(false)}
+              initial="rest"
+              animate={isHovering ? "hover" : "rest"}
+            >
+              <motion.img 
+                src={assets.profile_icon} 
+                alt="Perfil" 
+                className='w-[20px]'
+                variants={{
+                  rest: { scale: 1 },
+                  hover: { 
+                    scale: 1.1,
+                    transition: { duration: 0.2 }
+                  }
+                }}
+              />
+              <AnimatePresence>
+                {isHovering && (
+                  <motion.ul 
+                    className='absolute right-0 z-10 bg-white shadow-md flex flex-col gap-2.5 px-2 py-2 rounded-2xl list-none w-[180px] mt-2 origin-top-right'
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ 
+                      opacity: 1, 
+                      y: 0, 
+                      scale: 1,
+                      transition: { duration: 0.15, ease: 'easeOut' }
+                    }}
+                    exit={{ 
+                      opacity: 0, 
+                      y: 10, 
+                      scale: 0.95,
+                      transition: { duration: 0.1 }
+                    }}
+                  >
+                    <motion.li 
+                      onClick={() => navigate("/mis-ordenes")} 
+                      className='flex items-center gap-2.5 cursor-pointer p-2 rounded-lg hover:bg-gray-50'
+                      whileHover={{ x: 2 }}
+                    >
+                      <img src={assets.bag_icon} alt="Órdenes" className='w-[20px] opacity-70' />
+                      <p>Órdenes</p>
+                    </motion.li>
+                    <motion.li 
+                      onClick={() => navigate("/mensajes")} 
+                      className='flex items-center gap-2.5 cursor-pointer p-2 rounded-lg hover:bg-gray-50'
+                      whileHover={{ x: 2 }}
+                    >
+                      <img src={assets.chat_icon} alt="Mensajes" className='w-[20px] opacity-70' />
+                      <p>Mensajes</p>
+                    </motion.li>
+                    <motion.hr className='my-1 border-t border-gray-100' />
+                    <motion.li 
+                      onClick={handleLogout} 
+                      className='flex items-center gap-2.5 cursor-pointer p-2 rounded-lg text-red-500 hover:bg-red-50'
+                      whileHover={{ x: 2 }}
+                    >
+                      <img src={assets.logout_icon} alt="Cerrar Sesión" className='w-[20px]' />
+                      <p>Cerrar Sesión</p>
+                    </motion.li>
+                  </motion.ul>
+                )}
+              </AnimatePresence>
+            </motion.div>
           )}
         </div>
       </div>
