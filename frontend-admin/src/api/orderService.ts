@@ -1,4 +1,6 @@
-import axios, { AxiosError } from 'axios';
+import { axios } from '@/context/AuthContext';
+import { AxiosError } from 'axios';
+
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 const PREFIX = '/api/v1/order';

@@ -1,4 +1,5 @@
-import axios from 'axios';
+import { axios } from '@/context/AuthContext';
+
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 const PREFIX = '/api/v1/admin-api/api-keys';

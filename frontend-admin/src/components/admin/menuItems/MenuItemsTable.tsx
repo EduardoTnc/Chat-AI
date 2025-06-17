@@ -66,7 +66,16 @@ const MenuItemsTable = ({ showDeleted = false, onRestore }: MenuItemsTableProps)
             </TableCell>
             <TableCell className="font-medium">{item.name}</TableCell>
             <TableCell>S/.{item.price.toFixed(2)}</TableCell>
-            <TableCell>{item.category}</TableCell>
+            <TableCell className="flex items-center gap-2">
+              {typeof item.category === 'object' && item.category?.imageUrl && (
+                <img
+                  src={`${import.meta.env.VITE_API_URL}/api/v1/images/${item.category.imageUrl}`}
+                  alt={item.category.name}
+                  className="h-6 w-6 object-cover rounded-full"
+                />
+              )}
+              <span>{typeof item.category === 'object' ? item.category.name : item.category || 'Sin categoría'}</span>
+            </TableCell>
             <TableCell>
               {item.isDeleted ? (
                 <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300">

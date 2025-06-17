@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { Plus, X, Check, ChevronDown, Loader2 } from 'lucide-react';
-import { getUniqueCategories } from '@/api/menuItemService';
+import { Loader2, Image as ImageIcon, X } from 'lucide-react';
+import { addMenuItem } from '@/api/menuItemService';
+import { getCategories } from '@/api/categoryService';
+import type { Category } from '@/store/menuItemStore';
 
 interface CreateMenuItemDialogProps {
   open: boolean;
@@ -18,70 +23,63 @@ const CreateMenuItemDialog = ({ open, onOpenChange, onSuccess }: CreateMenuItemD
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('');
-  const [newCategory, setNewCategory] = useState('');
-  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categoryId, setCategoryId] = useState('');
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   // Cargar categorías al abrir el diálogo
   useEffect(() => {
     const loadCategories = async () => {
       try {
         setIsLoadingCategories(true);
-        const fetchedCategories = await getUniqueCategories();
-        setCategories(fetchedCategories);
+        const response = await getCategories();
+        setCategories(response);
       } catch (error) {
-        console.error('Error al cargar categorías:', error);
-        toast.error('Error al cargar las categorías');
+        console.error('Error loading categories:', error);
+        toast.error('Error loading categories');
       } finally {
         setIsLoadingCategories(false);
       }
     };
-    
+
     if (open) {
       loadCategories();
+    } else {
+      // Reset form when dialog closes
+      setName('');
+      setDescription('');
+      setPrice('');
+      setCategoryId('');
+      setImageFile(null);
+      setImagePreview(null);
+      setError('');
     }
   }, [open]);
-  
-  const handleAddCategory = async () => {
-    if (!newCategory.trim()) {
-      toast.error('El nombre de la categoría no puede estar vacío');
-      return;
-    }
-    
-    const trimmedCategory = newCategory.trim();
-    
-    if (categories.includes(trimmedCategory)) {
-      toast.error('Esta categoría ya existe');
-      return;
-    }
-    
-    try {
-      // La categoría se guardará cuando se guarde el ítem
-      setCategories(prev => [...prev, trimmedCategory]);
-      setCategory(trimmedCategory);
-      setNewCategory('');
-      setIsAddingCategory(false);
-      toast.success('Categoría agregada');
-    } catch (error) {
-      console.error('Error al agregar categoría:', error);
-      toast.error('Error al agregar la categoría');
-    }
-  };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!category) {
-      toast.error('Por favor selecciona o crea una categoría');
+    if (!categoryId) {
+      toast.error('Por favor selecciona una categoría');
+      return;
+    }
+    
+    if (!imageFile) {
+      toast.error('Por favor selecciona una imagen');
       return;
     }
     
@@ -93,37 +91,19 @@ const CreateMenuItemDialog = ({ open, onOpenChange, onSuccess }: CreateMenuItemD
       formData.append('name', name);
       formData.append('description', description);
       formData.append('price', price);
-      formData.append('category', category);
-      
-      if (imageFile) {
-        formData.append('image', imageFile);
-      }
+      formData.append('category', categoryId);
+      formData.append('imageUrl', imageFile);
 
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/menu-items/add`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al crear el ítem');
-      }
+      await addMenuItem(formData);
 
       toast.success('Ítem creado exitosamente');
       onOpenChange(false);
       onSuccess?.();
-      
-      // Reset form
-      setName('');
-      setDescription('');
-      setPrice('');
-      setCategory('');
-      setImageFile(null);
     } catch (error: any) {
       console.error('Error al crear el ítem:', error);
-      setError(error.message || 'Error al crear el ítem');
-      toast.error(error.message || 'Error al crear el ítem');
+      const errorMessage = error.response?.data?.message || error.message || 'Error al crear el ítem';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -146,149 +126,123 @@ const CreateMenuItemDialog = ({ open, onOpenChange, onSuccess }: CreateMenuItemD
             </div>
           )}
           
-          <div className="space-y-2">
-            <label htmlFor="name" className="block text-sm font-medium">
-              Nombre
-            </label>
-            <Input
-              id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="description" className="block text-sm font-medium">
-              Descripción
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              required
-              disabled={loading}
-            />
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Nombre</Label>
+                <Input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="price">Precio (S/.)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label htmlFor="price" className="block text-sm font-medium">
-                Precio (S/.)
-              </label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                min="0"
-                value={price}
-                onChange={(e) => setPrice(e.target.value)}
+              <Label htmlFor="description">Descripción</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Ingrese la descripción del ítem"
+                className="min-h-[100px]"
                 required
                 disabled={loading}
               />
             </div>
-            
+
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label htmlFor="category" className="block text-sm font-medium">
-                  Categoría
-                </label>
-                {!isAddingCategory && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 text-xs text-primary"
-                    onClick={() => setIsAddingCategory(true)}
-                  >
-                    <Plus className="mr-1 h-3 w-3" />
-                    Nueva categoría
-                  </Button>
-                )}
-              </div>
-              
+              <Label>Categoría</Label>
               {isLoadingCategories ? (
-                <div className="flex h-10 items-center justify-center rounded-md border bg-muted/50">
+                <div className="flex items-center justify-center h-10 border rounded-md bg-muted/50">
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
-              ) : isAddingCategory ? (
-                <div className="flex gap-2">
-                  <Input
-                    id="new-category"
-                    value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
-                    placeholder="Nombre de la categoría"
-                    className="flex-1"
-                    autoFocus
-                    disabled={loading}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleAddCategory}
-                    disabled={!newCategory.trim() || loading}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => {
-                      setIsAddingCategory(false);
-                      setNewCategory('');
-                    }}
-                    disabled={loading}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
               ) : (
-                <div className="relative">
-                  <select
-                    id="category"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className="flex h-10 w-full appearance-none items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    required
-                    disabled={loading}
-                  >
-                    <option value="">Selecciona una categoría</option>
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
+                <Select
+                  value={categoryId}
+                  onValueChange={setCategoryId}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category._id} value={category._id}>
+                        <div className="flex items-center gap-2">
+                          {category.imageUrl && (
+                            <img
+                              src={`${import.meta.env.VITE_API_URL}/api/v1/images/${category.imageUrl}`}
+                              alt={category.name}
+                              className="h-5 w-5 object-cover rounded-full"
+                            />
+                          )}
+                          {category.name}
+                        </div>
+                      </SelectItem>
                     ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-2.5 h-4 w-4 opacity-50" />
-                </div>
+                  </SelectContent>
+                </Select>
               )}
             </div>
+
+            <div className="space-y-2">
+              <Label>Imagen</Label>
+              <div className="flex items-center gap-4">
+                <div className="relative w-24 h-24 rounded-md overflow-hidden border border-dashed border-muted-foreground/25 flex items-center justify-center">
+                  {imagePreview ? (
+                    <img
+                      src={imagePreview}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <ImageIcon className="h-6 w-6 mb-1" />
+                      <span className="text-xs">Vista previa</span>
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <Input
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    disabled={loading}
+                  />
+                  <Label
+                    htmlFor="image"
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 cursor-pointer"
+                  >
+                    Seleccionar imagen
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Formatos: JPG, PNG, WEBP. Máx. 2MB
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="image" className="block text-sm font-medium">
-              Imagen (opcional)
-            </label>
-            <Input
-              id="image"
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              disabled={loading}
-            />
-            {imageFile && (
-              <p className="text-xs text-muted-foreground">
-                {imageFile.name} ({(imageFile.size / 1024).toFixed(2)} KB)
-              </p>
-            )}
-          </div>
-          
-          <div className="flex justify-end space-x-2 pt-4">
+
+          <DialogFooter className="pt-4">
             <Button
               type="button"
               variant="outline"
@@ -298,9 +252,16 @@ const CreateMenuItemDialog = ({ open, onOpenChange, onSuccess }: CreateMenuItemD
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Creando...' : 'Crear ítem'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creando...
+                </>
+              ) : (
+                'Crear ítem'
+              )}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

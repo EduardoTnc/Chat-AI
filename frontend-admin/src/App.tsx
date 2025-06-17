@@ -10,6 +10,7 @@ import FullChatPage from './pages/FullChatPage';
 import DashboardPage from './pages/DashboardPage';
 import { useAuth } from './context/AuthContext';
 import AppSidebar from './components/admin/layout/AppSidebar';
+import CategoriesPage   from './pages/CategoriesPage';
 
 function App() {
   const { isAuthenticated } = useAuth();
@@ -23,6 +24,7 @@ function App() {
             <Route index element={<DashboardPage />} />
             <Route path='users' element={<UserManagementPage />} />
             <Route path="menu-items" element={<MenuItemsPage />} />
+            <Route path="categories" element={<CategoriesPage />} />
             <Route path="ai-models" element={<AIModelsPage />} />
             <Route path="api-keys" element={<ApiKeysPage />} />
             <Route path="orders" element={<OrdersPage />} />

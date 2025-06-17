@@ -10,20 +10,52 @@ import {
   getUniqueCategories,
   searchMenuItems
 } from "../controllers/menuItemController.js"
-import multer from "multer"
-import { protect, authorize } from "../middleware/authMiddleware.js"
+import multer from "multer";
+import { protect, authorize } from "../middleware/authMiddleware.js";
+import { promises as fs } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const menuItemRouter = express.Router();
 
-// Configuración de multer
+// Configuración de multer con sanitización de nombres de archivo
 const storage = multer.diskStorage({
-  destination: "uploads",
+  destination: async (req, file, cb) => {
+    try {
+      // Create a subdirectory for menu items
+      const dest = join(process.cwd(), 'uploads/menu-items');
+      // Ensure directory exists
+      await fs.mkdir(dest, { recursive: true });
+      cb(null, dest);
+    } catch (error) {
+      cb(error);
+    }
+  },
   filename: (req, file, cb) => {
-    return cb(null, `${Date.now()} ${file.originalname}`)
+    // Sanitize filename: replace spaces with underscores and remove special characters
+    const sanitizedFilename = `${Date.now()}_${file.originalname.replace(/[^\w\d.-]/g, '_').replace(/\s+/g, '_')}`;
+    return cb(null, sanitizedFilename);
   }
-})
+});
 
-const upload = multer({storage:storage})
+const fileFilter = (req, file, cb) => {
+  // Accept images only
+  if (!file.originalname.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+    return cb(new Error('Solo se permiten archivos de imagen (jpg, jpeg, png, gif, webp)'), false);
+  }
+  cb(null, true);
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  }
+});
 
 menuItemRouter.post("/add", protect, authorize("admin"), upload.single("imageUrl"), addMenuItem)
 menuItemRouter.get("/list-all", protect, authorize("admin"), listAllMenuItems)

@@ -1,11 +1,19 @@
 import { create } from 'zustand';
 
+export interface Category {
+  _id: string;
+  name: string;
+  imageUrl?: string;
+  isDeleted?: boolean;
+  createdAt?: string;
+}
+
 export interface MenuItem {
   _id: string;
   name: string;
   description: string;
   price: number;
-  category: string;
+  category: Category | string; // Support both object and string for backward compatibility
   imageUrl: string;
   isDeleted?: boolean;
   createdAt?: string;

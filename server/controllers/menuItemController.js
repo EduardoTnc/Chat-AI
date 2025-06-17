@@ -1,45 +1,79 @@
 import menuItemModel from "../models/menuItemModel.js"
 import fs from 'fs'
+import mongoose from 'mongoose';
 import { ApiError } from "../utils/errorHandler.js";
 
-// agregra un menuItem
-const addMenuItem = async (req, res) => {
+// Agrega un ítem al menú
+const addMenuItem = async (req, res, next) => {
   try {
-    let image_filename = `${req.file.filename}`;
+    const { name, description, price, category } = req.body;
+    
+    if (!req.file) {
+      return next(new ApiError(400, 'La imagen es requerida'));
+    }
+
+    // Validar que la categoría exista
+    const categoryExists = await mongoose.model('Category').findById(category);
+    if (!categoryExists) {
+      return next(new ApiError(400, 'La categoría especificada no existe'));
+    }
 
     const menuItem = new menuItemModel({
-      name: req.body.name,
-      description: req.body.description,
-      price: req.body.price,
-      category: req.body.category,
-      imageUrl: image_filename,
-    })
+      name,
+      description,
+      price: parseFloat(price),
+      category,
+      imageUrl: req.file.filename,
+    });
 
-    await menuItem.save()
+    await menuItem.save();
+    await menuItem.populate('category', 'name imageUrl');
 
-    res.json({ success: true, message: "menuItem agregado correctamente", menuItem })
+    res.status(201).json({ 
+      success: true, 
+      message: "Ítem del menú agregado correctamente", 
+      menuItem 
+    });
 
   } catch (error) {
-    console.log(error)
-    res.json({ success: false, message: "Error al agregar el menuItem" })
+    console.error('Error al agregar ítem del menú:', error);
+    next(new ApiError(500, 'Error al agregar el ítem del menú', error.message));
   }
-}
+};
 
-// lista todos los menuItems
-const listMenuItems = async (req, res) => {
+// Lista todos los ítems del menú (excluyendo eliminados)
+const listMenuItems = async (req, res, next) => {
   try {
-    const menuItems = await menuItemModel.find()
-    res.json({ success: true, message: "menuItems listados correctamente", menuItems })
-  } catch (error) {
-    console.log(error)
-    res.json({ success: false, message: "Error al listar los menuItems" })
-  }
-}
+    const { category } = req.query;
+    const query = { isDeleted: { $ne: true } };
+    
+    if (category) {
+      query.category = mongoose.Types.ObjectId(category);
+    }
 
-// lista todos los menuItems (incluyendo los eliminados)
+    const menuItems = await menuItemModel.find(query)
+      .populate('category', 'name imageUrl')
+      .sort({ createdAt: -1 });
+      
+    res.json({ 
+      success: true, 
+      message: "Ítems del menú listados correctamente", 
+      menuItems 
+    });
+  } catch (error) {
+    console.error('Error al listar ítems del menú:', error);
+    next(new ApiError(500, 'Error al listar los ítems del menú'));
+  }
+};
+
+// Lista todos los ítems del menú (incluyendo eliminados)
 const listAllMenuItems = async (req, res, next) => {
   try {
-    const menuItems = await menuItemModel.find().setOptions({ withDeleted: true });
+    const menuItems = await menuItemModel.find()
+      .populate('category', 'name imageUrl')
+      .setOptions({ withDeleted: true })
+      .sort({ isDeleted: 1, name: 1 });
+      
     res.json({
       success: true,
       message: "Todos los ítems del menú listados correctamente",
@@ -49,18 +83,28 @@ const listAllMenuItems = async (req, res, next) => {
     console.error('Error al listar todos los ítems:', error);
     next(new ApiError(500, 'Error al listar los ítems del menú'));
   }
-}
+};
 
-// lista un menuItem
-const listMenuItem = async (req, res) => {
+// Obtiene un ítem del menú por ID
+const listMenuItem = async (req, res, next) => {
   try {
     const menuItem = await menuItemModel.findById(req.params.id)
-    res.json({ success: true, message: "menuItem listado correctamente", menuItem })
+      .populate('category', 'name imageUrl');
+      
+    if (!menuItem) {
+      return next(new ApiError(404, 'Ítem del menú no encontrado'));
+    }
+    
+    res.json({ 
+      success: true, 
+      message: "Ítem del menú encontrado", 
+      menuItem 
+    });
   } catch (error) {
-    console.log(error)
-    res.json({ success: false, message: "Error al listar el menuItem" })
+    console.error('Error al obtener el ítem del menú:', error);
+    next(new ApiError(500, 'Error al obtener el ítem del menú'));
   }
-}
+};
 
 // elimina (lógicamente) un menuItem
 const removeMenuItem = async (req, res, next) => {
@@ -74,27 +118,33 @@ const removeMenuItem = async (req, res, next) => {
       return next(new ApiError(404, 'Menu Item no encontrado.'));
     }
     // No eliminar la imagen físicamente, podrías querer restaurarla.
-    res.json({ success: true, message: "MenuItem eliminado lógicamente", data: menuItem });
+    res.json({ success: true, message: "MenuItem eliminado lógicamente", menuItem });
   } catch (error) {
     next(error);
   }
 };
 
-// Actualiza un menuItem con los campos proporcionados
-
-
+// Actualiza un ítem del menú con los campos proporcionados
 const updateMenuItem = async (req, res, next) => {
   try {
     const { id } = req.params;
     const updates = { ...req.body };
 
-    // Buscar el item actual para verificar si se está actualizando la imagen
+    // Buscar el ítem actual
     const currentItem = await menuItemModel.findById(id);
     if (!currentItem) {
-      return next(new ApiError(404, 'Menu Item no encontrado.'));
+      return next(new ApiError(404, 'Ítem del menú no encontrado'));
     }
 
-    // Si se está subiendo una nueva imagen, eliminar la anterior
+    // Si se está actualizando la categoría, validar que exista
+    if (updates.category) {
+      const categoryExists = await mongoose.model('Category').findById(updates.category);
+      if (!categoryExists) {
+        return next(new ApiError(400, 'La categoría especificada no existe'));
+      }
+    }
+
+    // Manejo de la imagen
     if (req.file) {
       updates.imageUrl = req.file.filename;
       // Eliminar la imagen anterior si existe
@@ -110,21 +160,24 @@ const updateMenuItem = async (req, res, next) => {
       delete updates.imageUrl;
     }
 
-    // Actualizar solo los campos proporcionados
-    const updatedItem = await menuItemModel.findByIdAndUpdate(
-      id,
-      { $set: updates },
-      { new: true, runValidators: true }
-    );
+    // Convertir el precio a número si está presente
+    if (updates.price) {
+      updates.price = parseFloat(updates.price);
+    }
+
+    // Actualizar el ítem
+    const updatedItem = await menuItemModel
+      .findByIdAndUpdate(id, updates, { new: true, runValidators: true })
+      .populate('category', 'name imageUrl');
 
     res.json({
       success: true,
-      message: 'Menu Item actualizado correctamente',
+      message: 'Ítem del menú actualizado correctamente',
       updatedItem
     });
   } catch (error) {
-    console.error('Error al actualizar el menu item:', error);
-    next(new ApiError(500, 'Error al actualizar el Menu Item'));
+    console.error('Error al actualizar el ítem del menú:', error);
+    next(new ApiError(500, 'Error al actualizar el ítem del menú', error.message));
   }
 };
 
@@ -171,14 +224,50 @@ const restoreMenuItem = async (req, res, next) => {
   }
 };
 
-// Obtener todas las categorías únicas
+// Obtener todas las categorías únicas con información de los ítems
 const getUniqueCategories = async (req, res, next) => {
   try {
-    const categories = await menuItemModel.distinct('category');
+    // Obtener categorías únicas que están siendo usadas en ítems no eliminados
+    const categories = await menuItemModel.aggregate([
+      { $match: { isDeleted: { $ne: true } } },
+      { $group: { _id: '$category' } },
+      {
+        $lookup: {
+          from: 'categories',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'categoryInfo'
+        }
+      },
+      { $unwind: '$categoryInfo' },
+      {
+        $project: {
+          _id: 1,
+          name: '$categoryInfo.name',
+          imageUrl: '$categoryInfo.imageUrl',
+          itemCount: 1
+        }
+      }
+    ]);
+
+    // Contar ítems por categoría
+    const categoriesWithCounts = await Promise.all(
+      categories.map(async (category) => {
+        const count = await menuItemModel.countDocuments({
+          category: category._id,
+          isDeleted: { $ne: true }
+        });
+        return {
+          ...category,
+          itemCount: count
+        };
+      })
+    );
+
     res.json({
       success: true,
       message: "Categorías obtenidas correctamente",
-      data: categories
+      data: categoriesWithCounts
     });
   } catch (error) {
     console.error('Error al obtener las categorías:', error);
@@ -186,49 +275,57 @@ const getUniqueCategories = async (req, res, next) => {
   }
 };
 
-// Buscar ítems del menú
+// Buscar ítems del menú con filtros avanzados
 const searchMenuItems = async (req, res, next) => {
   try {
-    const { query, category, maxPrice, limit = 5 } = req.query;
+    const { query, category, maxPrice, minPrice, limit = 10, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    if (!query) {
-      return next(new ApiError(400, 'El parámetro de búsqueda es requerido'));
-    }
-
     const searchQuery = {
-      $and: [
-        { deleted: { $ne: true } }, // No incluir eliminados
-        {
-          $or: [
-            { name: { $regex: query, $options: 'i' } },
-            { description: { $regex: query, $options: 'i' } },
-            { category: { $regex: query, $options: 'i' } }
-          ]
-        }
+      isDeleted: { $ne: true },
+      $or: [
+        { name: { $regex: query || '', $options: 'i' } },
+        { description: { $regex: query || '', $options: 'i' } },
       ]
     };
 
-    // Aplicar filtros adicionales si se proporcionan
-    if (category) {
-      searchQuery.$and.push({ category: { $regex: new RegExp(`^${category}$`, 'i') } });
+    // Aplicar filtros adicionales
+    if (category && mongoose.Types.ObjectId.isValid(category)) {
+      searchQuery.category = new mongoose.Types.ObjectId(category);
     }
     
-    if (maxPrice) {
-      searchQuery.$and.push({ price: { $lte: parseFloat(maxPrice) } });
+    if (maxPrice || minPrice) {
+      searchQuery.price = {};
+      if (maxPrice) searchQuery.price.$lte = parseFloat(maxPrice);
+      if (minPrice) searchQuery.price.$gte = parseFloat(minPrice);
     }
 
-    const items = await menuItemModel.find(searchQuery)
-      .limit(parseInt(limit))
-      .lean();
+    // Búsqueda con conteo total para paginación
+    const [items, total] = await Promise.all([
+      menuItemModel.find(searchQuery)
+        .populate('category', 'name imageUrl')
+        .sort({ name: 1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      menuItemModel.countDocuments(searchQuery)
+    ]);
 
     res.json({
       success: true,
       message: 'Búsqueda completada',
-      data: items
+      data: {
+        items,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
     });
   } catch (error) {
     console.error('Error al buscar ítems del menú:', error);
-    next(new ApiError(500, 'Error al buscar ítems del menú'));
+    next(new ApiError(500, 'Error al buscar ítems del menú', error.message));
   }
 };
 
