@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const Carrito = () => {
-  const { carritoItems, listaPlatos, quitarDelCarrito, calcularMontoTotal, totalItems, vaciarCarrito } = useContext(TiendaContext);
+  const { carritoItems, listaPlatos, agregarAlCarrito, quitarDelCarrito, calcularMontoTotal, totalItems, vaciarCarrito } = useContext(TiendaContext);
   const { urlApi } = useAuth();
   const navigate = useNavigate();
   const mobileScreen = window.innerWidth < 640;
@@ -25,6 +25,26 @@ const Carrito = () => {
       })
       .filter(Boolean);
   }, [carritoItems, listaPlatos]);
+
+  // Handle quantity change for cart items
+  const handleQuantityChange = (itemId, newQuantity) => {
+    if (newQuantity < 0) return;
+    
+    const currentQuantity = carritoItems[itemId] || 0;
+    const diff = newQuantity - currentQuantity;
+    
+    if (diff > 0) {
+      // Add the difference
+      for (let i = 0; i < diff; i++) {
+        agregarAlCarrito(itemId);
+      }
+    } else if (diff < 0) {
+      // Remove the difference
+      for (let i = 0; i < -diff; i++) {
+        quitarDelCarrito(itemId);
+      }
+    }
+  };
 
   // Clear invalid cart items
   useEffect(() => {
@@ -47,12 +67,11 @@ const Carrito = () => {
   return (
     <div className='mt-24'>
       <div className="">
-        <div className="grid grid-cols-6 items-center text-gray-700 text-[12px] md:text-[16px] mb-2">
+        <div className="grid grid-cols-5 items-center text-gray-700 text-[12px] md:text-[16px] mb-2">
           <p className='col-span-2'>{mobileScreen ? "Item" : "Item / Platillo"}</p>
-          <p className='col-span-1'>{mobileScreen ? "P/u" : "Precio Unitario"}</p>
-          <p className='col-span-1'>{mobileScreen ? "Cant." : "Cantidad"}</p>
-          <p className='col-span-1'>Subtotal</p>
-          <p className='col-span-1'>Quitar</p>
+          <p className='col-span-1 text-center'>{mobileScreen ? "P/u" : "Precio"}</p>
+          <p className='col-span-1 text-center'>{mobileScreen ? "Cant." : "Cantidad"}</p>
+          <p className='col-span-1 text-right pr-4'>{mobileScreen ? "Total" : "Subtotal"}</p>
         </div>
         <hr className='text-gray-400' />
         
@@ -69,24 +88,58 @@ const Carrito = () => {
         ) : (
           validCartItems.map((item) => (
             <div key={item._id}>
-              <div className="grid grid-cols-6 items-center text-[12px] md:text-[16px] my-2.5 text-black">
+              <div className="grid grid-cols-5 items-center text-[12px] md:text-[16px] my-2.5 text-black hover:bg-gray-50 rounded-lg p-2">
                 <div className='flex items-center gap-2 col-span-2'>
                   <img 
                     src={`${urlApi}/images/${item.imageUrl}`} 
                     alt={item.name} 
                     className={`object-cover rounded-2xl shadow ${mobileScreen ? "w-[30px] h-[30px]" : "w-[80px] h-[30px]"}`} 
                   />
-                  <p className={mobileScreen ? "" : "ms-2"}>{item.name}</p>
+                  <p className={`truncate max-w-[150px] ${mobileScreen ? "" : "ms-2"}`} title={item.name}>
+                    {item.name}
+                  </p>
                 </div>
-                <p className='col-span-1'>S/.{item.price.toFixed(2)}</p>
-                <p className='col-span-1'>{item.quantity}</p>
-                <p className='col-span-1'>S/.{(item.price * item.quantity).toFixed(2)}</p>
-                <button 
-                  onClick={() => quitarDelCarrito(item._id)} 
-                  className={`col-span-1 cursor-pointer bg-red-500 text-white px-2 py-1 rounded-full ${mobileScreen ? "w-[40px]" : "w-[80px]"}`}
-                >
-                  {mobileScreen ? "X" : "Quitar"}
-                </button>
+                <p className='col-span-1 text-center'>S/.{item.price.toFixed(2)}</p>
+                <div className='col-span-1 flex items-center justify-center gap-2'>
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuantityChange(item._id, item.quantity - 1);
+                    }}
+                    className='w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-base cursor-pointer select-none'
+                    role='button'
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleQuantityChange(item._id, item.quantity - 1);
+                      }
+                    }}
+                    aria-label='Reducir cantidad'
+                  >
+                    −
+                  </div>
+                  <span className='min-w-[20px] text-center font-medium'>{item.quantity}</span>
+                  <div 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleQuantityChange(item._id, item.quantity + 1);
+                    }}
+                    className='w-6 h-6 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 text-base cursor-pointer select-none'
+                    role='button'
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleQuantityChange(item._id, item.quantity + 1);
+                      }
+                    }}
+                    aria-label='Aumentar cantidad'
+                  >
+                    +
+                  </div>
+                </div>
+                <p className='col-span-1 text-right pr-4 font-medium'>S/.{(item.price * item.quantity).toFixed(2)}</p>
               </div>
               <hr className='text-gray-300 h-[1px]' />
             </div>
