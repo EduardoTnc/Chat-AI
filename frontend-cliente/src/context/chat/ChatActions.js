@@ -5,7 +5,9 @@ export const useChatActions = (
     socket,
     setCurrentChat,
     setMessages,
+    fetchAIMessages,
     setIsAIChatActive,
+    setSelectedAIModel,
     setAiConversationId,
     tempMessageIdCounter,
     setTempMessageIdCounter,
@@ -69,12 +71,101 @@ export const useChatActions = (
 
     // MARK: selectAIChat
     // Función para seleccionar el chat con IA
-    const selectAIChat = useCallback(() => {
+    const selectAIChat = useCallback(async () => {
         console.log('Seleccionando chat con IA');
         setCurrentChat(null);
         setMessages([]);
         setIsAIChatActive(true);
-    }, [currentChat]);
+        
+        // Si ya hay una conversación de IA, cargar los mensajes
+        if (aiConversationId) {
+            console.log('Cargando mensajes de la conversación IA existente:', aiConversationId);
+            await fetchAIMessages(aiConversationId, 1, 50);
+            return;
+        }
+
+        // Función para cargar modelos de IA
+        const loadAIModels = async () => {
+            try {
+                console.log('Cargando modelos de IA...');
+                const response = await axios.get(
+                    `${urlApi}/ai-api/models`,
+                    { 
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+                
+                if (response.data.success && response.data.data?.length > 0) {
+                    const models = response.data.data;
+                    console.log('Modelos cargados:', models);
+                    return models;
+                }
+                return [];
+            } catch (error) {
+                console.error('Error al cargar modelos de IA:', error);
+                return [];
+            }
+        };
+
+        // Función auxiliar para buscar conversación existente con un modelo dado
+        const searchExistingConversation = async (model) => {
+            if (!model?.modelId) {
+                console.error('Modelo no válido para buscar conversación:', model);
+                return false;
+            }
+            
+            console.log('Buscando conversación IA existente para el modelo:', model.modelId);
+            try {
+                const response = await axios.get(
+                    `${urlApi}/ai-api/conversations/latest`,
+                    { 
+                        params: { modelId: model.modelId },
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                if (response.data.success && response.data.data) {
+                    const conversation = response.data.data;
+                    console.log('Conversación IA existente encontrada:', conversation._id);
+                    setAiConversationId(conversation._id);
+                    await fetchAIMessages(conversation._id, 1, 50);
+                    return true;
+                } else {
+                    console.log('No se encontró una conversación IA existente para este modelo');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error al buscar conversación IA existente:', error);
+                return false;
+            }
+        };
+
+        // Si ya tenemos un modelo seleccionado, intentar usarlo primero
+        if (selectedAIModel?.modelId) {
+            console.log('Usando modelo seleccionado:', selectedAIModel.modelId);
+            const found = await searchExistingConversation(selectedAIModel);
+            if (found) return;
+        }
+
+        // Si no se encontró conversación o no hay modelo seleccionado, cargar modelos
+        console.log('Cargando modelos de IA...');
+        const models = await loadAIModels();
+        
+        if (models.length > 0) {
+            const defaultModel = models.find(model => model.isDefault) || models[0];
+            console.log('Modelo seleccionado:', defaultModel);
+            setSelectedAIModel(defaultModel);
+            await searchExistingConversation(defaultModel);
+        } else {
+            console.log('No se encontraron modelos de IA disponibles');
+        }
+    }, [aiConversationId, fetchAIMessages, selectedAIModel, urlApi, token]);
 
     // MARK: sendMessageToUser
     // Función para enviar mensaje a usuario
@@ -136,6 +227,26 @@ export const useChatActions = (
         });
     }, [socket, currentChat, user, tempMessageIdCounter]);
 
+    // MARK: escalateToAgent
+    // Función para solicitar la escalación de la conversación actual a un agente humano
+    const escalateToAgent = useCallback(async () => {
+        try {
+            if (!aiConversationId) {
+                console.warn('No hay conversación de IA para escalar');
+                return;
+            }
+            console.log('Solicitando escalación de la conversación', aiConversationId);
+            const response = await axios.post(`${urlApi}/chat-api/conversations/${aiConversationId}/escalate`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (response.data.success) {
+                // toast.success('Solicitaste hablar con un agente, te conectaremos en breve.');
+            }
+        } catch (error) {
+            console.error('Error solicitando escalación:', error);
+        }
+    }, [aiConversationId, urlApi, token]);
+
     // MARK: sendMessageToIA
     // Función para enviar mensaje a IA
     const sendMessageToIA = useCallback(async (text, model = null) => {
@@ -170,12 +281,16 @@ export const useChatActions = (
             }
 
             const payload = {
-                modelId: model?._id || selectedAIModel?._id,
+                modelId: model?.modelId || selectedAIModel?.modelId,
                 content: text,
                 conversationId: aiConversationId, // Puede ser null
                 tempId,
                 clientInfo: { userAgent: navigator.userAgent }
             };
+            
+            if (!payload.modelId) {
+                throw new Error('No se pudo determinar el modelo de IA a utilizar');
+            }
 
             console.log('Enviando mensaje a IA vía socket:', payload);
 
@@ -276,6 +391,7 @@ export const useChatActions = (
         sendMessageToUser,
         sendMessageToIA,
         markConversationAsRead,
-        requestNotificationPermission
+        requestNotificationPermission,
+        escalateToAgent
     };
 };

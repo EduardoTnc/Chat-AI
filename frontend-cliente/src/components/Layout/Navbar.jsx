@@ -132,7 +132,7 @@ const Navbar = ({ onLoginClick }) => {
               }}
               whileTap={{ scale: 0.98 }}
               onClick={onLoginClick} 
-              className="border border-tomato hover:bg-tomato cursor-pointer text-tomato px-2.5 py-2 rounded-full"
+              className="border border-tomato hover:bg-tomato hover:text-white transition-colors cursor-pointer  text-tomato px-2.5 py-2 rounded-full"
             >
               Iniciar Sesión
             </motion.button>

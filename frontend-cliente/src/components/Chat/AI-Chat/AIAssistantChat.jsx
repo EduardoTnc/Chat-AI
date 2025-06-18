@@ -19,6 +19,7 @@ const AIAssistantChat = () => {
     aiConversationId, // ID de la conversación con la IA
     loadingMessages, // Para cuando se cargan mensajes de IA
     setMessages, // Para limpiar mensajes
+    escalateToAgent, // Función para escalar a agente
   } = useContext(ChatContext);
   const { user: currentUser } = useAuth();
 
@@ -41,14 +42,16 @@ const AIAssistantChat = () => {
     }
   }, [fetchAIModels, aiModels.length]);
 
-  // Load messages when conversation changes
+  // Load messages when conversation or model changes
   useEffect(() => {
     if (aiConversationId) {
       console.log('Loading messages for conversation:', aiConversationId);
       fetchAIMessages(aiConversationId);
     } else if (selectedAIModel) {
-      // If we have a selected model but no conversation, clear messages
-      console.log('No conversation ID, clearing messages');
+      console.log('Attempting to load most recent conversation for model:', selectedAIModel._id);
+      // The ChatContext should handle loading the most recent conversation for this model
+    } else {
+      console.log('No conversation ID and no selected model');
       setMessages([]);
     }
   }, [aiConversationId, selectedAIModel, fetchAIMessages, setMessages]);
@@ -228,6 +231,16 @@ const AIAssistantChat = () => {
               <h3>¡Hola! Soy tu Asistente IA</h3>
               <p>Selecciona un modelo y pregúntame lo que necesites.</p>
             </div>
+            <button 
+              className="escalate-button" 
+              onClick={escalateToAgent}
+              disabled={!aiConversationId}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+              </svg>
+              Hablar con un agente
+            </button>
           </div>
         ) : (
           <>
@@ -258,6 +271,27 @@ const AIAssistantChat = () => {
             <div ref={messagesEndRef} />
           </>
         )}
+      </div>
+
+      <div className="ai-chat-actions">
+        <div className="escalate-button-container">
+          <button 
+            className="escalate-button" 
+            onClick={escalateToAgent}
+            disabled={!aiConversationId}
+            title={!aiConversationId ? "Inicia una conversación con el asistente para habilitar esta opción" : "Hablar con un agente humano"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            {aiConversationId ? "Hablar con un agente" : "Inicia una conversación para poder escalar a un agente humano"}
+          </button>
+          {!aiConversationId && (
+            <div className="escalate-tooltip">
+              Inicia una conversación con el asistente para habilitar esta opción
+            </div>
+          )}
+        </div>
       </div>
 
       <form className="ai-message-form" onSubmit={handleSendMessage}>

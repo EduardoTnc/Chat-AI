@@ -146,7 +146,7 @@ export const useChatFetchers = (
 
     // MARK: fetchAIModels
     // Función para cargar modelos de IA disponibles
-    const fetchAIModels = useCallback(async () => {
+    const fetchAIModels = useCallback(async (setSelectedAIModel) => {
         if (!token) return;
 
         try {
@@ -162,6 +162,15 @@ export const useChatFetchers = (
                 console.log("models", response.data);
                 console.log(`${models.length} modelos IA obtenidos`);
                 setAiModels(models);
+
+                // Seleccionar el modelo predeterminado (isDefault: true) si existe
+                if (models && models.length > 0) {
+                    const defaultModel = models.find(model => model.isDefault) || models[0];
+                    console.log('Modelo seleccionado por defecto:', defaultModel);
+                    if (setSelectedAIModel) {
+                        setSelectedAIModel(defaultModel);
+                    }
+                }
 
                 return { success: true, data: models };
             } else {

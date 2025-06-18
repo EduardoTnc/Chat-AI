@@ -96,6 +96,33 @@ export const searchUsersForChat = async (req, res, next) => {
 	}
 };
 
+// MARK: escalateConversation
+export const escalateConversation = async (req, res, next) => {
+    try {
+        const { conversationId } = req.params;
+        const { reason = "", urgency = "medium", escalatedByTool = false } = req.body || {};
+        const updatedConversation = await messageService.escalateConversation(
+            conversationId,
+            req.user,
+            { reason, urgency, escalatedByTool }
+        );
+
+        // Emitir evento socket a agentes y admins si existe instancia de io
+        const io = req.app.get('io');
+        if (io) {
+            io.to('agents_room').emit('conversation_escalated', { conversation: updatedConversation });
+            io.to('admins_room').emit('conversation_escalated', { conversation: updatedConversation });
+        }
+        res.status(200).json({
+            success: true,
+            message: "Conversación escalada",
+            data: updatedConversation,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // MARK: createOrGetConversation
 export const createOrGetConversation = async (req, res, next) => {
 	try {

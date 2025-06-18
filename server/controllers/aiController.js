@@ -2,6 +2,7 @@ import AIService from '../chat-module/services/AIService.js';
 import MessageService from '../chat-module/services/MessageService.js';
 import AdminConfigService from '../chat-module/services/AdminConfigService.js'; // AIService depende de esto
 import { ApiError } from '../utils/errorHandler.js';
+import Conversation from '../models/Conversation.js';
 
 const adminConfigService = new AdminConfigService();
 const aiService = new AIService(adminConfigService); // Instanciar servicios
@@ -73,12 +74,50 @@ export const markAIChatAsRead = async (req, res, next) => {
         const userId = req.user._id;
         const { conversationId } = req.params;
 
-        const updatedConversation = await messageService.markConversationAsRead(conversationId, userId);
+        // El servicio ya valida permisos
+        await messageService.markMessagesAsRead(conversationId, userId);
 
         res.status(200).json({
             success: true,
-            message: "Conversación de IA marcada como leída",
-            data: updatedConversation
+            message: 'Mensajes marcados como leídos',
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// MARK: getLatestAIConversation
+export const getLatestAIConversation = async (req, res, next) => {
+    try {
+        const userId = req.user._id;
+        const { modelId } = req.query;
+
+        if (!modelId) {
+            throw new ApiError(400, 'Se requiere el ID del modelo');
+        }
+
+        // Buscar la conversación más reciente de tipo user-to-ia para este usuario y modelo
+        const conversation = await Conversation.findOne({
+            'participants': userId,
+            'type': 'user-to-ia',
+            'aiModelId': modelId
+        })
+        .sort({ 'updatedAt': -1 }) // Ordenar por fecha de actualización descendente
+        .select('_id title status updatedAt') // Solo los campos necesarios
+        .lean();
+
+        if (!conversation) {
+            return res.status(200).json({
+                success: true,
+                data: null,
+                message: 'No se encontraron conversaciones previas para este modelo'
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: conversation,
+            message: 'Última conversación encontrada'
         });
     } catch (error) {
         next(error);

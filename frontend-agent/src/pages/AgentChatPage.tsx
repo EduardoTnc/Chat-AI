@@ -2,6 +2,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { useAgentSocket } from '../hooks/useAgentSocket';
 import ConversationQueue from '../components/agent-chat/ConversationQueue';
+import EscalatedQueue from '../components/agent-chat/EscalatedQueue';
 import MessageArea from '../components/agent-chat/MessageArea';
 import ConversationDetails from '../components/agent-chat/ConversationDetails';
 import { useTheme } from '../context/ThemeContext';
@@ -22,7 +23,8 @@ const AgentChatPage = () => {
                 </div>
             </header>
             <main className="flex-grow grid grid-cols-1 md:grid-cols-4 gap-4 p-4 max-h-[calc(100vh-6rem)]">
-                <div className="md:col-span-1">
+                <div className="md:col-span-1 flex flex-col gap-4 overflow-hidden">
+                    <EscalatedQueue />
                     <ConversationQueue />
                 </div>
                 <div className="md:col-span-2">

@@ -102,7 +102,7 @@ class AISocketHandler {
             //? Ahora notificamos a los agentes.
             if (originalToolCallingMessage && originalToolCallingMessage.toolCalls?.some(tc => tc.function.name === 'escalate_to_human_agent')) {
                 const conversation = await this.messageService.getConversationById(conversationId, this.user._id, this.user.role); // Recargar con datos de escalación
-                this.io.to(AGENT_ROOM).emit('newEscalatedChat', {
+                this.io.to(AGENT_ROOM).emit('conversation_escalated', {
                     conversationId,
                     userId: this.user._id,
                     userName: this.user.name,

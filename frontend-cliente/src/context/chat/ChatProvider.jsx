@@ -110,11 +110,14 @@ const ChatContextProvider = ({ children }) => {
         sendMessageToUser,
         sendMessageToIA,
         requestNotificationPermission,
+        escalateToAgent
     } = useChatActions(
         socket, // Ahora pasamos el socket real
         setCurrentChat,
         setMessages,
+        fetchAIMessages,
         setIsAIChatActive,
+        setSelectedAIModel,
         setAiConversationId,
         tempMessageIdCounter,
         setTempMessageIdCounter,
@@ -167,7 +170,7 @@ const ChatContextProvider = ({ children }) => {
     useEffect(() => {
         if (token) {
             fetchConversations(1, 20);
-            fetchAIModels();
+            fetchAIModels(setSelectedAIModel); // Pasar setSelectedAIModel para configurar el modelo por defecto
         }
     }, [token]);
 
@@ -263,6 +266,7 @@ const ChatContextProvider = ({ children }) => {
         sendMessageToUser,
         requestNotificationPermission,
 
+        escalateToAgent,
         // Acciones de chat con IA
         selectAIChat,
         sendMessageToIA,

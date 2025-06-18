@@ -13,15 +13,20 @@ const MisOrdenes = () => {
   const [initialAuthCheck, setInitialAuthCheck] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const fetchOrders = async () => {
     console.log('fetchOrders called, isAuthenticated:', isAuthenticated, 'token:', !!token);
-    
+
     // If we're still checking auth state, don't show the login popup yet
     if (isCheckingAuth) {
       console.log('Still checking auth state...');
       return;
     }
-    
+
     // Only show login if we're sure the user is not authenticated
     if (!token) {
       console.log('No token found, user not authenticated');
@@ -41,17 +46,17 @@ const MisOrdenes = () => {
     try {
       console.log('Fetching orders with token:', token);
       const response = await axios.post(
-        `${urlApi}/order/list`, 
-        {}, 
-        { 
-          headers: { 
+        `${urlApi}/order/list`,
+        {},
+        {
+          headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
           },
           withCredentials: true
         }
       );
-      
+
       console.log('Orders response:', response.data);
       if (response.data.success) {
         setOrdersData(response.data.orders || []);
@@ -92,12 +97,12 @@ const MisOrdenes = () => {
   // Handle auth state changes
   useEffect(() => {
     console.log('Auth state changed - isAuthenticated:', isAuthenticated, 'token:', !!token);
-    
+
     // If we're still checking auth, don't do anything yet
     if (isCheckingAuth) {
       return;
     }
-    
+
     // If we have a token and are authenticated, fetch orders
     if (token && isAuthenticated) {
       console.log('User is authenticated, fetching orders');
@@ -117,7 +122,7 @@ const MisOrdenes = () => {
       console.log('Initial auth check complete');
       setInitialAuthCheck(true);
       setIsCheckingAuth(false);
-      
+
       // Only show login if there's no token after the initial check
       if (!token) {
         console.log('No token found after initial check, showing login');
@@ -127,7 +132,7 @@ const MisOrdenes = () => {
         setShowLogin(false);
       }
     }, 300); // Slightly longer delay to ensure auth context is ready
-    
+
     return () => clearTimeout(timer);
   }, [token]);
 
@@ -151,7 +156,7 @@ const MisOrdenes = () => {
   return (
     <div className='flex flex-col gap-6 mt-24 px-4 max-w-7xl mx-auto w-full'>
       <h2 className='text-3xl font-bold text-gray-800'>Mis Órdenes</h2>
-      
+
       {!isAuthenticated ? (
         <div className="bg-white rounded-lg shadow-sm p-8 text-center max-w-2xl mx-auto w-full">
           <div className="bg-tomato/10 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -159,7 +164,7 @@ const MisOrdenes = () => {
           </div>
           <h3 className="text-xl font-semibold text-gray-800 mb-2">Inicia sesión para ver tus pedidos</h3>
           <p className="text-gray-600 mb-6">Accede a tu historial de pedidos y realiza un seguimiento de tus órdenes actuales.</p>
-          <button 
+          <button
             onClick={() => setShowLogin(true)}
             className="bg-tomato text-white px-6 py-2.5 rounded-full font-medium hover:bg-tomato/90 transition-colors"
           >
@@ -223,9 +228,9 @@ const MisOrdenes = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(order.createdAt).toLocaleString('es-PE', { 
-                        day: '2-digit', 
-                        month: '2-digit', 
+                      {new Date(order.createdAt).toLocaleString('es-PE', {
+                        day: '2-digit',
+                        month: '2-digit',
                         year: '2-digit',
                         hour: '2-digit',
                         minute: '2-digit'
@@ -268,8 +273,8 @@ const MisOrdenes = () => {
         </div>
       )}
 
-      <LoginPopup 
-        isOpen={showLogin} 
+      <LoginPopup
+        isOpen={showLogin}
         onClose={() => setShowLogin(false)}
         onLoginSuccess={handleLoginSuccess}
       />

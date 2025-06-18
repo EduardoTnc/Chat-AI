@@ -146,6 +146,59 @@ class MessageService {
 
 
 
+    // MARK: - escalateConversation
+    /**
+     * Escala una conversación a un agente humano.
+     * Cambia el status a 'pending_agent' y rellena metadata.escalationDetails.
+     * Solo puede ser llamada por un participante (rol user) o por IA (rol system).
+     */
+    async escalateConversation(conversationId, requestingUser, { reason = "", urgency = "medium", escalatedByTool = false } = {}) {
+        // Validar acceso
+        await this._validateConversationAccess(conversationId, requestingUser._id, requestingUser.role);
+
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) throw new ApiError(404, "Conversación no encontrada");
+
+        // Si ya está escalada o cerrada, nada que hacer
+        if (["pending_agent", "agent_active", "archived", "closed_by_agent", "closed_by_user"].includes(conversation.status)) {
+            return conversation;
+        }
+
+        conversation.status = "pending_agent";
+        conversation.metadata = conversation.metadata || {};
+        conversation.metadata.escalationDetails = {
+            reason,
+            urgency,
+            escalatedByTool,
+            escalationTimestamp: new Date()
+        };
+
+        await conversation.save();
+        return conversation;
+    }
+
+    // MARK: - assignAgentToConversation
+    /**
+     * Asigna un agente a una conversación escalada y cambia el status a 'agent_active'.
+     */
+    async assignAgentToConversation(conversationId, agentId, requestingUser) {
+        // Verificar que el solicitante sea el mismo agente o un admin
+        if (requestingUser.role !== 'agent' && requestingUser.role !== 'admin') {
+            throw new ApiError(403, 'Solo agentes o administradores pueden asignarse a conversaciones.');
+        }
+        const conversation = await Conversation.findById(conversationId);
+        if (!conversation) throw new ApiError(404, 'Conversación no encontrada');
+
+        if (conversation.status !== 'pending_agent') {
+            throw new ApiError(400, 'La conversación no está pendiente de agente.');
+        }
+
+        conversation.agentId = agentId;
+        conversation.status = 'agent_active';
+        await conversation.save();
+        return conversation.populate('participants', 'name role');
+    }
+
     // MARK: - getAllConversationsForAdmin
     /**
      * Obtiene todas las conversaciones en el sistema. Solo los administradores pueden usar esta función.

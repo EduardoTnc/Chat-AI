@@ -1,27 +1,36 @@
 import { create } from 'zustand';
 
-// Define the types for the store's state
-interface Conversation {
+export interface Conversation {
   id: string;
-  customerName: string;
-  lastMessage: string;
-  timestamp: string;
+  customerName?: string;
+  userName?: string;
+  lastMessage?: string;
+  timestamp?: string;
 }
 
 interface AgentState {
   conversations: Conversation[];
+  escalatedConversations: Conversation[];
   currentConversationId: string | null;
-  setConversations: (conversations: Conversation[]) => void;
+  // bulk setters
+  setConversations: (convos: Conversation[]) => void;
+  setEscalatedConversations: (convos: Conversation[]) => void;
   setCurrentConversationId: (id: string | null) => void;
-  addConversation: (conversation: Conversation) => void;
+  // mutators
+  addConversation: (convo: Conversation) => void;
+  addEscalatedConversation: (convo: Conversation) => void;
+  removeEscalatedConversation: (id: string) => void;
 }
 
-// Create the Zustand store
-export const useAgentStore = create<AgentState>((set: any) => ({
+export const useAgentStore = create<AgentState>((set) => ({
   conversations: [],
+  escalatedConversations: [],
   currentConversationId: null,
-  setConversations: (conversations: Conversation[]) => set({ conversations }),
-  setCurrentConversationId: (id: string | null) => set({ currentConversationId: id }),
-  addConversation: (conversation: Conversation) => 
-    set((state: AgentState) => ({ conversations: [conversation, ...state.conversations] })),
+  setConversations: (convos) => set({ conversations: convos }),
+  setEscalatedConversations: (convos) => set({ escalatedConversations: convos }),
+  setCurrentConversationId: (id) => set({ currentConversationId: id }),
+  addConversation: (convo) => set((state) => ({ conversations: [convo, ...state.conversations] })),
+  addEscalatedConversation: (convo) => set((state) => ({ escalatedConversations: [convo, ...state.escalatedConversations] })),
+  removeEscalatedConversation: (id) =>
+    set((state) => ({ escalatedConversations: state.escalatedConversations.filter((c) => c.id !== id) })),
 }));

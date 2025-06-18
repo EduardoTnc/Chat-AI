@@ -1,4 +1,4 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { ChatContext } from '../../context/chat/ChatContext';
 import ConversationList from './ConversationList';
@@ -10,6 +10,12 @@ import { useAuth } from '../../context/AuthContext';
 const ChatPage = () => {
   const { token } = useAuth();
   const { isAIChatActive } = useContext(ChatContext);
+
+
+  // Scroll to top on component mount
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   // Redireccionar si el usuario no está autenticado
   if (!token) {

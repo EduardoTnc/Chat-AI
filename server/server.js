@@ -30,6 +30,9 @@ const startServer = async () => {
     // Inicializar manejadores de Socket.IO
     initializeSocketIO(io);
 
+    // Exponer la instancia de io para usarla en controladores (req.app.get('io'))
+    app.set('io', io);
+
     // Solo escuchar si no estamos en modo test
     // Las pruebas de Supertest iniciarán el servidor por su cuenta usando la app exportada.
     if (config.env !== 'test') {

@@ -4,7 +4,8 @@ import {
     getMessagesForConversation,
     markUserConversationAsRead,
     searchUsersForChat,
-    createOrGetConversation
+    createOrGetConversation,
+    escalateConversation
 } from '../controllers/chatController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -16,6 +17,8 @@ router.use(protect);
 router.get('/', getUserConversations); // Obtener todas las conversaciones del usuario logueado
 router.get('/:conversationId/messages', getMessagesForConversation); // Obtener mensajes de una conversación específica
 router.post('/:conversationId/mark-as-read', markUserConversationAsRead); // Marcar toda la conversación como leída
+// Escalar conversación a un agente
+router.post('/conversations/:conversationId/escalate', escalateConversation);
 // Ruta protegida para buscar usuarios
 router.get("/search", searchUsersForChat)
 // Ruta para crear o obtener una conversación entre dos usuarios
